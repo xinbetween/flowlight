@@ -132,7 +132,7 @@ enum AdvisoryCatalogVerifier {
                     try bytes.append(node.negate ? UInt8(1) : UInt8(0))
                     try bytes.append(UInt32(node.matches.count))
                     for match in node.matches {
-                        guard !match.criteria.isEmpty, !match.bundleIDs.isEmpty else {
+                        guard !match.criteria.isEmpty, !match.bundleIDs.isEmpty || !match.targets.isEmpty else {
                             throw AdvisoryCatalogVerificationError.invalidCPEMatch
                         }
                         try bytes.append(match.criteria)
@@ -144,6 +144,23 @@ enum AdvisoryCatalogVerifier {
                         try bytes.append(match.versionStartExcluding)
                         try bytes.append(match.versionEndIncluding)
                         try bytes.append(match.versionEndExcluding)
+                        // Keep the legacy canonical bytes unchanged when no typed targets are present. Typed
+                        // targets are appended as an extension so old signed catalogs remain verifiable.
+                        if !match.targets.isEmpty {
+                            var previous: String?
+                            try bytes.append(UInt8(1))
+                            try bytes.append(UInt32(match.targets.count))
+                            for target in match.targets {
+                                guard !target.identifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                                    throw AdvisoryCatalogVerificationError.invalidCPEMatch
+                                }
+                                let key = "\(target.kind.rawValue):\(target.identifier.lowercased())"
+                                if let previous, previous >= key { throw AdvisoryCatalogVerificationError.invalidCPEMatch }
+                                previous = key
+                                try bytes.append(target.kind.rawValue)
+                                try bytes.append(target.identifier)
+                            }
+                        }
                     }
                 }
             }
@@ -271,7 +288,12 @@ enum AdvisoryCatalogVerifier {
                     for node in try array(c["nodes"]) {
                         let n = try dictionary(node, keys: ["operation", "negate", "matches"])
                         for match in try array(n["matches"]) {
-                            _ = try dictionary(match, keys: ["criteria", "matchCriteriaID", "vulnerable", "bundleIDs", "versionStartIncluding", "versionStartExcluding", "versionEndIncluding", "versionEndExcluding"], optional: ["matchCriteriaID", "versionStartIncluding", "versionStartExcluding", "versionEndIncluding", "versionEndExcluding"])
+                            let m = try dictionary(match, keys: ["criteria", "matchCriteriaID", "vulnerable", "bundleIDs", "targets", "versionStartIncluding", "versionStartExcluding", "versionEndIncluding", "versionEndExcluding"], optional: ["matchCriteriaID", "bundleIDs", "targets", "versionStartIncluding", "versionStartExcluding", "versionEndIncluding", "versionEndExcluding"])
+                            if let targets = m["targets"] {
+                                for target in try array(targets) {
+                                    _ = try dictionary(target, keys: ["kind", "identifier"])
+                                }
+                            }
                         }
                     }
                 }

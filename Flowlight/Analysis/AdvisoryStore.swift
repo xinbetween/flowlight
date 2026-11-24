@@ -68,4 +68,8 @@ final class AdvisoryStore: ObservableObject {
     func matches(_ app: AdvisoryAppVersion) -> [SecurityAdvisory] {
         advisories.filter { $0.matches(app) }.sorted { $0.id < $1.id }
     }
+
+    func matches(_ artifact: AdvisoryArtifact) -> [SecurityAdvisory] {
+        advisories.filter { $0.matches(artifact) }.sorted { $0.id < $1.id }
+    }
 }

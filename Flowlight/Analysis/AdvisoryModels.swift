@@ -62,25 +62,38 @@ struct AdvisoryNode: Codable, Equatable, Hashable, Sendable {
     }
 }
 
-/// A normalized CPE match. `bundleIDs` is the explicit local identity bridge: a CPE product name alone cannot
-/// truthfully identify an installed macOS application, so matching never guesses a bundle identifier from it.
+/// A signed, kind-qualified local identity. The catalog must name the artifact kind explicitly; a display name or
+/// CPE product alone is never enough to identify local software.
+struct AdvisoryTarget: Codable, Equatable, Hashable, Sendable {
+    var kind: AdvisoryArtifactKind
+    var identifier: String
+
+    init(kind: AdvisoryArtifactKind, identifier: String) {
+        self.kind = kind
+        self.identifier = identifier
+    }
+}
+
+/// A normalized CPE match. Legacy app entries use `bundleIDs`; new entries use `targets` for non-bundle software.
 struct AdvisoryCPEMatch: Codable, Equatable, Hashable, Sendable {
     var criteria: String
     var matchCriteriaID: String?
     var vulnerable: Bool
     var bundleIDs: [String]
+    var targets: [AdvisoryTarget]
     var versionStartIncluding: String?
     var versionStartExcluding: String?
     var versionEndIncluding: String?
     var versionEndExcluding: String?
 
     init(criteria: String, matchCriteriaID: String? = nil, vulnerable: Bool = true, bundleIDs: [String] = [],
-         versionStartIncluding: String? = nil, versionStartExcluding: String? = nil,
+         targets: [AdvisoryTarget] = [], versionStartIncluding: String? = nil, versionStartExcluding: String? = nil,
          versionEndIncluding: String? = nil, versionEndExcluding: String? = nil) {
         self.criteria = criteria
         self.matchCriteriaID = matchCriteriaID
         self.vulnerable = vulnerable
         self.bundleIDs = bundleIDs
+        self.targets = targets
         self.versionStartIncluding = versionStartIncluding
         self.versionStartExcluding = versionStartExcluding
         self.versionEndIncluding = versionEndIncluding
@@ -92,18 +105,42 @@ struct AdvisoryCPEMatch: Codable, Equatable, Hashable, Sendable {
         case matchCriteriaID = "matchCriteriaId"
         case vulnerable
         case bundleIDs
+        case targets
         case versionStartIncluding
         case versionStartExcluding
         case versionEndIncluding
         case versionEndExcluding
     }
 
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        criteria = try container.decode(String.self, forKey: .criteria)
+        matchCriteriaID = try container.decodeIfPresent(String.self, forKey: .matchCriteriaID)
+        vulnerable = try container.decode(Bool.self, forKey: .vulnerable)
+        bundleIDs = try container.decodeIfPresent([String].self, forKey: .bundleIDs) ?? []
+        targets = try container.decodeIfPresent([AdvisoryTarget].self, forKey: .targets) ?? []
+        versionStartIncluding = try container.decodeIfPresent(String.self, forKey: .versionStartIncluding)
+        versionStartExcluding = try container.decodeIfPresent(String.self, forKey: .versionStartExcluding)
+        versionEndIncluding = try container.decodeIfPresent(String.self, forKey: .versionEndIncluding)
+        versionEndExcluding = try container.decodeIfPresent(String.self, forKey: .versionEndExcluding)
+    }
+
     /// The CPE URI spelling used by NVD. The normalized model still keeps this as a criteria string.
     var cpeURI: String { criteria }
 
-    /// A match without an explicit local identity is deliberately not applicable to an installed app.
+    /// A legacy app match without an explicit local identity is deliberately not applicable.
     func targets(bundleID: String) -> Bool {
         bundleIDs.contains { $0.caseInsensitiveCompare(bundleID) == .orderedSame }
+    }
+
+    func targets(artifact: AdvisoryArtifact) -> Bool {
+        if artifact.kind == .application,
+           bundleIDs.contains(where: { $0.caseInsensitiveCompare(artifact.identifier) == .orderedSame }) {
+            return true
+        }
+        return targets.contains {
+            $0.kind == artifact.kind && $0.identifier.caseInsensitiveCompare(artifact.identifier) == .orderedSame
+        }
     }
 
     var versionRange: AdvisoryVersionRange {

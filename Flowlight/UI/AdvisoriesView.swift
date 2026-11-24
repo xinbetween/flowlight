@@ -1,63 +1,88 @@
 import SwiftUI
 
-/// A local-first view of application advisories. It deliberately reports unknown and unassessed states instead of
-/// turning an incomplete inventory or an empty catalog into a claim that an application is safe.
+/// A local-first view of advisories for bundles, executables, Homebrew formulae, and selected project packages.
+/// It reports unknown and incomplete states explicitly; a no-match result is never presented as proof of safety.
 struct AdvisoriesView: View {
     @ObservedObject var store: AdvisoryStore
     @ObservedObject var updater: AdvisoryCatalogUpdater
-    @State private var apps: [InstalledApps.App] = []
+    @State private var artifacts: [AdvisoryArtifact] = []
+    @State private var sources: [AdvisoryInventorySourceResult] = []
     @State private var scanComplete = false
     @State private var scanning = false
     @State private var refreshID = 0
-    @State private var selectedBundleID: String?
-    @State private var filter: AdvisoryFilter = .all
-    @State private var sortOrder = [KeyPathComparator<Row>(\.app.name)]
+    @State private var selectedArtifactID: String?
+    @State private var statusFilter: StatusFilter = .all
+    @State private var kindFilter: KindFilter = .all
+    @State private var sortOrder = [KeyPathComparator<Row>(\.artifact.name)]
 
-    enum AdvisoryFilter: String, CaseIterable, Identifiable {
+    enum StatusFilter: String, CaseIterable, Identifiable {
         case all, affected, unknown
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .all: return L("All applications")
+            case .all: return L("All")
             case .affected: return L("Affected")
             case .unknown: return L("Unknown or unassessed")
             }
         }
     }
 
-    fileprivate struct Row: Identifiable {
-        var app: InstalledApps.App
-        var matches: [SecurityAdvisory]
-        var id: String { app.id }
+    enum KindFilter: String, CaseIterable, Identifiable {
+        case all, application, executable, homebrewFormula, homebrewCask, nodePackage
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .all: return L("All software")
+            case .application: return AdvisoryArtifactKind.application.title
+            case .executable: return AdvisoryArtifactKind.executable.title
+            case .homebrewFormula: return AdvisoryArtifactKind.homebrewFormula.title
+            case .homebrewCask: return AdvisoryArtifactKind.homebrewCask.title
+            case .nodePackage: return AdvisoryArtifactKind.nodePackage.title
+            }
+        }
+        var kind: AdvisoryArtifactKind? {
+            switch self {
+            case .all: return nil
+            case .application: return .application
+            case .executable: return .executable
+            case .homebrewFormula: return .homebrewFormula
+            case .homebrewCask: return .homebrewCask
+            case .nodePackage: return .nodePackage
+            }
+        }
+    }
 
-        var isUnknown: Bool { app.marketingVersion == nil && app.buildVersion == nil }
+    fileprivate struct Row: Identifiable {
+        var artifact: AdvisoryArtifact
+        var matches: [SecurityAdvisory]
+        var id: String { artifact.id }
+        var isUnknown: Bool { !artifact.hasVersionEvidence }
         var isAffected: Bool { !matches.isEmpty }
     }
 
     private var allRows: [Row] {
-        apps.map { app in
-            Row(app: app, matches: store.matches(AdvisoryAppVersion(
-                bundleID: app.bundleID,
-                marketingVersion: app.marketingVersion,
-                buildVersion: app.buildVersion
-            )))
-        }
+        artifacts.map { artifact in Row(artifact: artifact, matches: store.matches(artifact)) }
     }
 
-    private var rows: [Row] {
-        switch filter {
-        case .all: return allRows
-        case .affected: return allRows.filter(\.isAffected)
-        case .unknown: return allRows.filter { $0.isUnknown || !store.catalogReady }
+    private var filteredRows: [Row] {
+        allRows.filter { row in
+            let kindMatches = kindFilter.kind.map { row.artifact.kind == $0 } ?? true
+            let statusMatches: Bool
+            switch statusFilter {
+            case .all: statusMatches = true
+            case .affected: statusMatches = row.isAffected
+            case .unknown: statusMatches = row.isUnknown || !store.catalogReady
+            }
+            return kindMatches && statusMatches
         }
     }
 
     var body: some View {
         GeometryReader { geometry in
             Group {
-                if scanning && apps.isEmpty {
+                if scanning && artifacts.isEmpty {
                     loading
-                } else if apps.isEmpty {
+                } else if artifacts.isEmpty {
                     empty
                 } else {
                     content(height: geometry.size.height)
@@ -65,7 +90,7 @@ struct AdvisoriesView: View {
             }
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
         }
-        .navigationTitle(L("Application advisories"))
+        .navigationTitle(L("Software advisories"))
         .navigationSubtitle(navigationSubtitle)
         .toolbar { toolbar }
         .task(id: refreshID) { await scan() }
@@ -76,15 +101,13 @@ struct AdvisoriesView: View {
 
     private var selectedBinding: Binding<Row?> {
         Binding(
-            get: { allRows.first { $0.id == selectedBundleID } },
-            set: { selectedBundleID = $0?.id }
+            get: { allRows.first { $0.id == selectedArtifactID } },
+            set: { selectedArtifactID = $0?.id }
         )
     }
 
     private var navigationSubtitle: String {
-        if !store.catalogReady {
-            return L("Local matching unavailable · applications are not assessed")
-        }
+        if !store.catalogReady { return L("Local matching unavailable · software is not assessed") }
         if let receipt = store.catalogState?.receipt {
             return L("Local matching · catalog sequence %lld", receipt.sequence)
         }
@@ -94,23 +117,19 @@ struct AdvisoriesView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItemGroup {
-            Button {
-                refreshID += 1
-            } label: {
-                Label(L("Rescan applications"), systemImage: "arrow.clockwise")
+            Button { refreshID += 1 } label: {
+                Label(L("Rescan software"), systemImage: "arrow.clockwise")
             }
             .disabled(scanning)
             .accessibilityIdentifier("advisories.rescan")
-            .help(L("Rescan accessible application bundles"))
+            .help(L("Rescan accessible local software and selected project folders"))
 
-            Button {
-                Task { await updater.checkNow() }
-            } label: {
+            Button { Task { await updater.checkNow() } } label: {
                 Label(L("Refresh catalog"), systemImage: "arrow.triangle.2.circlepath")
             }
             .disabled(updater.status == .checking)
             .accessibilityIdentifier("advisories.refresh-catalog")
-            .help(L("Check for a newer signed advisory catalog"))
+            .help(L("Check for a newer signed advisory catalog without uploading inventory"))
         }
     }
 
@@ -119,13 +138,16 @@ struct AdvisoriesView: View {
             catalogContext
             summary
             HStack(spacing: Spacing.s) {
-                Picker(L("Status"), selection: $filter) {
-                    ForEach(AdvisoryFilter.allCases) { value in
-                        Text(value.title).tag(value)
-                    }
+                Picker(L("Status"), selection: $statusFilter) {
+                    ForEach(StatusFilter.allCases) { value in Text(value.title).tag(value) }
                 }
                 .pickerStyle(.segmented)
                 .accessibilityIdentifier("advisories.filter")
+                Picker(L("Kind"), selection: $kindFilter) {
+                    ForEach(KindFilter.allCases) { value in Text(value.title).tag(value) }
+                }
+                .frame(width: 180)
+                .accessibilityIdentifier("advisories.kind-filter")
                 Spacer(minLength: 0)
                 Text(inventorySummary)
                     .font(.caption)
@@ -136,25 +158,31 @@ struct AdvisoriesView: View {
             Divider()
 
             if !scanComplete {
-                Label(L("This inventory may be incomplete; only accessible application bundles are shown."),
-                      systemImage: "exclamationmark.triangle")
-                    .font(.callout)
-                    .foregroundStyle(FL.warning)
-                    .padding(.horizontal, Spacing.s)
-                    .accessibilityIdentifier("advisories.incomplete")
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(L("This inventory may be incomplete. Only bounded, accessible sources are shown; no home-directory crawl is performed."),
+                          systemImage: "exclamationmark.triangle")
+                    if !sources.filter({ !$0.complete }).isEmpty {
+                        Text(L("Limited sources: %@", sources.filter { !$0.complete }.map(\.source).joined(separator: ", ")))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .font(.callout)
+                .foregroundStyle(FL.warning)
+                .padding(.horizontal, Spacing.s)
+                .accessibilityIdentifier("advisories.incomplete")
             }
 
-            if rows.isEmpty {
+            if filteredRows.isEmpty {
                 ContentUnavailableView {
-                    Label(L("No applications match this filter"), systemImage: "line.3.horizontal.decrease.circle")
+                    Label(L("No software matches this filter"), systemImage: "line.3.horizontal.decrease.circle")
                 } description: {
-                    Text(L("Try another status filter or rescan the application inventory."))
+                    Text(L("Try another status or software-kind filter, or rescan the local inventory."))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityIdentifier("advisories.filtered-empty")
             } else {
-                table
-                    .frame(height: max(180, height - 250), alignment: .top)
+                table.frame(height: max(180, height - 250), alignment: .top)
             }
         }
         .padding()
@@ -178,9 +206,8 @@ struct AdvisoriesView: View {
             if let sequence = store.catalogState?.receipt?.sequence { return "#\(sequence)" }
             return L("Ready")
         }()
-
         return HStack(spacing: Spacing.s) {
-            StatTile(title: L("Applications"), value: "\(allRows.count)", systemImage: "square.stack.3d.up")
+            StatTile(title: L("Software"), value: "\(allRows.count)", systemImage: "square.stack.3d.up")
             StatTile(title: L("Affected"), value: "\(affected)", systemImage: "exclamationmark.triangle",
                      tint: affected > 0 ? FL.critical : .secondary)
             StatTile(title: L("Needs review"), value: "\(needsReview)", systemImage: "questionmark.circle",
@@ -205,20 +232,19 @@ struct AdvisoriesView: View {
         } else {
             details.append(L("No verified catalog installed"))
         }
-        details.append(L("No application inventory is uploaded"))
+        details.append(L("Software inventory never leaves this Mac"))
         return details
     }
 
     private var inventorySummary: String {
         let affected = allRows.filter(\.isAffected).count
-        return L("%lld applications · %lld affected", allRows.count, affected)
+        return L("%lld software artifacts · %lld affected", allRows.count, affected)
     }
 
     private var loading: some View {
         VStack(spacing: Spacing.m) {
             ProgressView()
-            Text(L("Scanning accessible application bundles…"))
-                .foregroundStyle(.secondary)
+            Text(L("Scanning bounded local software sources…")).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("advisories.loading")
@@ -226,11 +252,11 @@ struct AdvisoriesView: View {
 
     private var empty: some View {
         ContentUnavailableView {
-            Label(L("No applications found"), systemImage: "square.stack.3d.up")
+            Label(L("No software found"), systemImage: "square.stack.3d.up")
         } description: {
             Text(scanComplete
-                 ? L("No accessible application bundles were found in the standard locations.")
-                 : L("The application inventory is incomplete or unavailable."))
+                 ? L("No accessible software was found in standard locations or selected project folders.")
+                 : L("The local software inventory is incomplete or unavailable."))
         } actions: {
             Button(L("Scan again")) { refreshID += 1 }
                 .accessibilityIdentifier("advisories.empty.rescan")
@@ -240,32 +266,45 @@ struct AdvisoriesView: View {
     }
 
     private var table: some View {
-        Table(rows, selection: $selectedBundleID, sortOrder: $sortOrder) {
-            TableColumn(L("Application"), value: \.app.name) { row in
+        Table(filteredRows, selection: $selectedArtifactID, sortOrder: $sortOrder) {
+            TableColumn(L("Software"), value: \.artifact.name) { row in
                 HStack(spacing: Spacing.s) {
-                    AppIconView(path: row.app.path, size: 22)
+                    if row.artifact.kind == .application, let iconPath = row.artifact.iconPath {
+                        AppIconView(path: iconPath, size: 22)
+                    } else {
+                        Image(systemName: row.artifact.kind.systemImage)
+                            .foregroundStyle(FL.accent)
+                            .frame(width: 22)
+                    }
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(row.app.name).lineLimit(1)
-                        Text(row.app.bundleID)
-                            .font(.caption2.monospaced())
+                        Text(row.artifact.name).lineLimit(1)
+                        Text(row.artifact.kind.title)
+                            .font(.caption2)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                 }
-                .help(row.app.bundleID)
+                .help(row.artifact.identifier)
                 .accessibilityElement(children: .combine)
                 .accessibilityValue(L("%@ · %@", versionText(for: row), statusTitle(for: row)))
-                .accessibilityIdentifier("advisories.app.\(row.app.bundleID)")
+                .accessibilityIdentifier(row.artifact.kind == .application
+                                         ? "advisories.app.\(row.artifact.identifier)"
+                                         : "advisories.artifact.\(row.artifact.id)")
             }
-            .width(min: 190, ideal: 250)
+            .width(min: 190, ideal: 240)
+
+            TableColumn(L("Identity")) { row in
+                Text(row.artifact.identifier)
+                    .font(.caption.monospaced())
+                    .lineLimit(1)
+                    .help(row.artifact.path)
+            }
+            .width(min: 150, ideal: 220)
 
             TableColumn(L("Version")) { row in
-                Text(versionText(for: row))
-                    .font(.caption)
-                    .lineLimit(1)
-                    .help(versionText(for: row))
+                Text(versionText(for: row)).font(.caption).lineLimit(1).help(versionText(for: row))
             }
-            .width(min: 130, ideal: 155)
+            .width(min: 130, ideal: 160)
 
             TableColumn(L("Assessment")) { row in
                 FLPill(text: statusTitle(for: row), systemImage: statusIcon(for: row), color: statusColor(for: row))
@@ -274,11 +313,8 @@ struct AdvisoriesView: View {
             .width(min: 125, ideal: 150)
 
             TableColumn(L("Findings"), value: \.matches.count) { row in
-                if row.matches.isEmpty {
-                    Text("–").foregroundStyle(.secondary)
-                } else {
-                    Text("\(row.matches.count)").monospacedDigit().foregroundStyle(FL.critical)
-                }
+                if row.matches.isEmpty { Text("–").foregroundStyle(.secondary) }
+                else { Text("\(row.matches.count)").monospacedDigit().foregroundStyle(FL.critical) }
             }
             .width(70)
         }
@@ -286,19 +322,25 @@ struct AdvisoriesView: View {
     }
 
     private func versionText(for row: Row) -> String {
-        if let marketing = row.app.marketingVersion {
-            if let build = row.app.buildVersion, build != marketing {
-                return L("Version %@ · build %@", marketing, build)
-            }
-            return L("Version %@", marketing)
+        guard let version = row.artifact.version else { return L("Version unknown") }
+        if let build = row.artifact.buildVersion, build != version {
+            return L("Version %@ · build %@ · %@", version, build, versionEvidenceTitle(for: row.artifact))
         }
-        if let build = row.app.buildVersion { return L("Build %@ · version unknown", build) }
-        return L("Version unknown")
+        return L("Version %@ · %@", version, versionEvidenceTitle(for: row.artifact))
+    }
+
+    private func versionEvidenceTitle(for artifact: AdvisoryArtifact) -> String {
+        switch artifact.versionEvidence {
+        case .bundleInfoDictionary: return L("Info.plist")
+        case .homebrewInstallReceipt: return L("Homebrew receipt")
+        case .packageJSON: return L("package.json")
+        case nil: return L("path only")
+        }
     }
 
     private func statusTitle(for row: Row) -> String {
         if !store.catalogReady { return L("Not assessed") }
-        if !row.matches.isEmpty { return L("Affected") }
+        if row.isAffected { return L("Affected") }
         if row.isUnknown { return L("Unknown version") }
         return L("No matching advisory")
     }
@@ -316,10 +358,11 @@ struct AdvisoriesView: View {
     private func scan() async {
         scanning = true
         let result = await Task.detached(priority: .utility) {
-            InstalledApps.scan(refresh: true)
+            AdvisoryInventoryScanner().scan()
         }.value
         guard !Task.isCancelled else { return }
-        apps = result.apps
+        artifacts = result.artifacts
+        sources = result.sources
         scanComplete = result.complete
         scanning = false
     }
@@ -335,13 +378,14 @@ private struct AdvisoryDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.m) {
                     FLContextRow(
-                        title: L("Application identity"),
-                        details: [row.app.bundleID, row.app.path, versionText],
-                        systemImage: "app.badge",
+                        title: L("Software identity"),
+                        details: [row.artifact.kind.title, row.artifact.identifier, row.artifact.path,
+                                  versionText, L("Evidence: %@", evidenceText)],
+                        systemImage: row.artifact.kind.systemImage,
                         identifier: "advisories.detail.identity"
                     )
                     if row.matches.isEmpty {
-                        Label(L("No confirmed advisory match is available for this application and catalog."),
+                        Label(L("No confirmed advisory match is available for this identity and catalog; this is not a safety claim."),
                               systemImage: "info.circle")
                             .foregroundStyle(.secondary)
                             .padding(Spacing.m)
@@ -354,8 +398,7 @@ private struct AdvisoryDetailView: View {
                                 HStack {
                                     Text(advisory.cveID).font(.headline.monospaced())
                                     Spacer()
-                                    FLPill(text: L("Affected"), systemImage: "exclamationmark.triangle.fill",
-                                           color: FL.critical)
+                                    FLPill(text: L("Affected"), systemImage: "exclamationmark.triangle.fill", color: FL.critical)
                                 }
                                 if let summary = advisory.summary { Text(summary).font(.callout) }
                                 if let published = advisory.published {
@@ -376,18 +419,26 @@ private struct AdvisoryDetailView: View {
                 }
                 .padding(Spacing.l)
             }
-            .navigationTitle(row.app.name)
+            .navigationTitle(row.artifact.name)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(L("Done")) { dismiss() }
-                }
+                ToolbarItem(placement: .confirmationAction) { Button(L("Done")) { dismiss() } }
             }
         }
-        .frame(minWidth: 520, minHeight: 340)
+        .frame(minWidth: 560, minHeight: 360)
     }
 
     private var versionText: String {
-        row.app.marketingVersion ?? row.app.buildVersion ?? L("Version unknown")
+        guard let version = row.artifact.version else { return L("Version unknown") }
+        if let build = row.artifact.buildVersion, build != version { return L("Version %@ · build %@", version, build) }
+        return version
+    }
+    private var evidenceText: String {
+        switch row.artifact.versionEvidence {
+        case .bundleInfoDictionary: return L("Info.plist")
+        case .homebrewInstallReceipt: return L("Homebrew install receipt")
+        case .packageJSON: return L("package.json")
+        case nil: return L("identity/path only")
+        }
     }
 }
 
@@ -400,23 +451,18 @@ private struct FLContextRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Spacing.s) {
-            Image(systemName: systemImage)
-                .foregroundStyle(tint)
-                .frame(width: 18)
-                .accessibilityHidden(true)
+            Image(systemName: systemImage).foregroundStyle(tint).frame(width: 18).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title).font(.callout.weight(.medium))
                 if !details.isEmpty {
                     Text(details.joined(separator: " · "))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, Spacing.m)
-        .padding(.vertical, Spacing.s)
+        .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.s)
         .frame(maxWidth: .infinity, alignment: .leading)
         .flCard(radius: Radius.chip)
         .accessibilityElement(children: .combine)
@@ -428,12 +474,7 @@ private struct FLContextRow: View {
 
 private struct AdvisoryAccessibilityIdentifier: ViewModifier {
     let identifier: String?
-
     func body(content: Content) -> some View {
-        if let identifier {
-            content.accessibilityIdentifier(identifier)
-        } else {
-            content
-        }
+        if let identifier { content.accessibilityIdentifier(identifier) } else { content }
     }
 }

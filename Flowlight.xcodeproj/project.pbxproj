@@ -271,6 +271,7 @@
 		84E8F07CBD455A23EE2DF978 /* ExportSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B82FFB06C5A1C98D5E4D7D1 /* ExportSettingsView.swift */; };
 		850653E102AF3CD2C3833524 /* ProcessNaming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94F3F458498856491A40E88C /* ProcessNaming.swift */; };
 		858D19CFF01AFC9E3FF8F364 /* AskProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D59A773537F63761107681A3 /* AskProvider.swift */; };
+		85AF39B347B04CD3298CA030 /* AdvisoryInventoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95CB7EB2D2399463EA720561 /* AdvisoryInventoryTests.swift */; };
 		8658DBDD8DE41686E075C7B0 /* DestinationProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22C46B9250A6ADDFD915500B /* DestinationProfileTests.swift */; };
 		870422099DB97DC2D8723679 /* PoliciesInteractionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A44FA09238F8128A09BE6CA7 /* PoliciesInteractionUITests.swift */; };
 		8753FD9223EF6AE4C892DB9A /* RewriteRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 694D30A62FAF11702B7EF605 /* RewriteRuleTests.swift */; };
@@ -334,6 +335,7 @@
 		A8869D4F16D83EC7120D901E /* PluginStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A55A095537DB24454B007D1B /* PluginStore.swift */; };
 		A912218AF0A00A7FB4EE5221 /* InsightsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FA151AA64480DAACC602123 /* InsightsPanel.swift */; };
 		A9675AD6413CA1740A75CE8F /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D9926D17DD57B7F97E895C9 /* JSONValue.swift */; };
+		AAE8046D04D25FDC302A9C78 /* AdvisoryInventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0C1564C8F8F9CE16E1CF50A /* AdvisoryInventory.swift */; };
 		AB9B40E51DA0C095CC143DC2 /* AgentInventoryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E1FBDB4AE42E05E5BE2131 /* AgentInventoryModel.swift */; };
 		AC05A53942C8EFE74039D3EE /* AdvisoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B7128883AF3C253584FF6D /* AdvisoryTests.swift */; };
 		AC5E1A01FEBC6A4C9951353E /* RuleSimulation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D8BAA4EB36D9B7D7BF56AD1 /* RuleSimulation.swift */; };
@@ -517,6 +519,7 @@
 		F58F09DB2BA526E5D834D162 /* PublicSuffixRules.generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = D69DA8D009371591EBBD0255 /* PublicSuffixRules.generated.swift */; };
 		F5AE32D382E6DDD1B06783B8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4849A413C60A9ABC4F9C16E /* SettingsView.swift */; };
 		F5F925E03C86F8B023DC788D /* ExtensionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53217054F0EFD8EC322BC5B1 /* ExtensionManager.swift */; };
+		F633D6974C4D069AB4C2155D /* AdvisoryInventory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0C1564C8F8F9CE16E1CF50A /* AdvisoryInventory.swift */; };
 		F75EB274ED11E8E4225746B2 /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCD98C0A49FC6C5521129087 /* ReportsView.swift */; };
 		F782A1187A8564DA1C37EDC1 /* DevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F2FBA5700CA1489D6740FC8 /* DevicesView.swift */; };
 		F7D8E5F618EF5B76959097BF /* InspectionBudgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E4DFA9032765BBB7E75706F /* InspectionBudgetTests.swift */; };
@@ -794,6 +797,7 @@
 		95761708CD76CABDF0696BCE /* ExtensionTrafficSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionTrafficSource.swift; sourceTree = "<group>"; };
 		95765A2F0D026D17736C9D9D /* LLMFacts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMFacts.swift; sourceTree = "<group>"; };
 		957EEA0C3C7342504E533506 /* NettopTrafficSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NettopTrafficSource.swift; sourceTree = "<group>"; };
+		95CB7EB2D2399463EA720561 /* AdvisoryInventoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvisoryInventoryTests.swift; sourceTree = "<group>"; };
 		96A2DDEBC714CDCFDB919F35 /* IPCProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPCProtocol.swift; sourceTree = "<group>"; };
 		97943E847A22CF491FA82084 /* RuleStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleStore.swift; sourceTree = "<group>"; };
 		97B74F69252BAEBB2F554030 /* AdvisoryCatalogVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvisoryCatalogVerifier.swift; sourceTree = "<group>"; };
@@ -811,6 +815,7 @@
 		9EF395A2F3D6C97FF9EC53E4 /* index.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = index.html; sourceTree = "<group>"; };
 		9FFEA980768CD488D58CC0B1 /* DemoInspection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoInspection.swift; sourceTree = "<group>"; };
 		A0A1C1F3361CA62C0D08C168 /* PluginEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginEngine.swift; sourceTree = "<group>"; };
+		A0C1564C8F8F9CE16E1CF50A /* AdvisoryInventory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvisoryInventory.swift; sourceTree = "<group>"; };
 		A15168A448857A6CC759F7BB /* RulePackEventDelivery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulePackEventDelivery.swift; sourceTree = "<group>"; };
 		A25AFB591CD2198569642663 /* official-source.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "official-source.json"; sourceTree = "<group>"; };
 		A2A5AC7D1719857AE8ED1CFA /* InsightsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsTests.swift; sourceTree = "<group>"; };
@@ -1118,6 +1123,7 @@
 				EE5948752EAE11488237D8DD /* AdvisoryCatalogState.swift */,
 				F85391DC4A7E94A08E887D49 /* AdvisoryCatalogUpdater.swift */,
 				97B74F69252BAEBB2F554030 /* AdvisoryCatalogVerifier.swift */,
+				A0C1564C8F8F9CE16E1CF50A /* AdvisoryInventory.swift */,
 				5F43E783C6A34A6C6F7EA25E /* AdvisoryModels.swift */,
 				097711EC33B3F15316CFC162 /* AdvisoryStore.swift */,
 				41B98E13F994F7E684F57C07 /* AgentAttributor.swift */,
@@ -1151,6 +1157,7 @@
 		47D0F2D7B8D7DEDEA845284F /* FlowlightTests */ = {
 			isa = PBXGroup;
 			children = (
+				95CB7EB2D2399463EA720561 /* AdvisoryInventoryTests.swift */,
 				10B7128883AF3C253584FF6D /* AdvisoryTests.swift */,
 				C66BAB050ED19B968765F3A9 /* AgentInventoryTests.swift */,
 				DD30777A046F705110A99269 /* AgentLauncherTests.swift */,
@@ -1854,6 +1861,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				85AF39B347B04CD3298CA030 /* AdvisoryInventoryTests.swift in Sources */,
 				AC05A53942C8EFE74039D3EE /* AdvisoryTests.swift in Sources */,
 				2394FFF1E44E14D49C179431 /* AgentInventoryTests.swift in Sources */,
 				FF3F2EE3FE29F6827D527B31 /* AgentLauncherTests.swift in Sources */,
@@ -1937,6 +1945,7 @@
 				CADC98C20ED493D799FC95E1 /* AdvisoryCatalogState.swift in Sources */,
 				578A1CA081A32D55E06D09BB /* AdvisoryCatalogUpdater.swift in Sources */,
 				ACA4B725E1BD5AF83FA14E76 /* AdvisoryCatalogVerifier.swift in Sources */,
+				F633D6974C4D069AB4C2155D /* AdvisoryInventory.swift in Sources */,
 				D54122CEF34017DF51E4EADD /* AdvisoryModels.swift in Sources */,
 				5C46A75FC62997970385CC42 /* AdvisoryStore.swift in Sources */,
 				B1E5CA21DA13E924DD50CB51 /* AgentAttributor.swift in Sources */,
@@ -2165,6 +2174,7 @@
 				C77E2F5009292CFDF4B79734 /* AdvisoryCatalogState.swift in Sources */,
 				DD731094389E51F5D08AF5EA /* AdvisoryCatalogUpdater.swift in Sources */,
 				96CA0407BA996A0B0BF2BEAF /* AdvisoryCatalogVerifier.swift in Sources */,
+				AAE8046D04D25FDC302A9C78 /* AdvisoryInventory.swift in Sources */,
 				C0E26C1E51C19FD50C65674E /* AdvisoryModels.swift in Sources */,
 				BC578009447A97DB642EC243 /* AdvisoryStore.swift in Sources */,
 				C35F10A4B87D29525A740DD5 /* AgentAttributor.swift in Sources */,
