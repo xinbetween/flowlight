@@ -1,4 +1,16 @@
 /* Analysis/AnomalyEngine.swift */
+
+/* Advisories executable version probing */
+"Identify executable versions" = "実行ファイルのバージョンを特定";
+"Runs bounded local version checks for supported executables; inventory never leaves this Mac." = "対応する実行ファイルのバージョンをローカルで制限付き確認します。インベントリがMacの外に出ることはありません。";
+"Stop" = "停止";
+"Scan now" = "今すぐスキャン";
+"Checked %lld of %lld supported executables" = "%lld/%lld個の対応実行ファイルを確認";
+"%lld supported executable%@ found. Version checks are explicit and time-limited." = "%lld個の対応実行ファイルが見つかりました。バージョン確認は明示的に実行され、時間制限があります。";
+"No supported executable versions were found to identify." = "特定できる対応実行ファイルのバージョンが見つかりませんでした。";
+"Identified %lld of %lld executable versions; some remain unknown." = "%lld/%lld個の実行ファイルのバージョンを特定しました。一部は不明のままです。";
+"Identified %lld of %lld executable versions." = "%lld/%lld個の実行ファイルのバージョンを特定しました。";
+"Executable version output" = "実行ファイルのバージョン出力";
 "Traffic spike" = "トラフィックの急増";
 "Unusual number of destinations" = "接続先の数が異常";
 "First contact with domain" = "ドメインへの初回接続";

@@ -122,6 +122,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.flowlight.app
         PRODUCT_NAME: Flowlight
+        SWIFT_MODULE_NAME: Flowlight
         INFOPLIST_FILE: Flowlight/Info-AppStore.plist
         CODE_SIGN_ENTITLEMENTS: Flowlight/Flowlight-AppStore.entitlements
         GENERATE_INFOPLIST_FILE: NO

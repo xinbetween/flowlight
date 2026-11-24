@@ -1,6 +1,18 @@
 /* Flowlight — en. The key is the English text, so an untranslated string shows correct English. */
 
 /* Analysis/AnomalyEngine.swift */
+
+/* Advisories executable version probing */
+"Identify executable versions" = "Identify executable versions";
+"Runs bounded local version checks for supported executables; inventory never leaves this Mac." = "Runs bounded local version checks for supported executables; inventory never leaves this Mac.";
+"Stop" = "Stop";
+"Scan now" = "Scan now";
+"Checked %lld of %lld supported executables" = "Checked %lld of %lld supported executables";
+"%lld supported executable%@ found. Version checks are explicit and time-limited." = "%lld supported executable%@ found. Version checks are explicit and time-limited.";
+"No supported executable versions were found to identify." = "No supported executable versions were found to identify.";
+"Identified %lld of %lld executable versions; some remain unknown." = "Identified %lld of %lld executable versions; some remain unknown.";
+"Identified %lld of %lld executable versions." = "Identified %lld of %lld executable versions.";
+"Executable version output" = "Executable version output";
 "Traffic spike" = "Traffic spike";
 "Unusual number of destinations" = "Unusual number of destinations";
 "First contact with domain" = "First contact with domain";

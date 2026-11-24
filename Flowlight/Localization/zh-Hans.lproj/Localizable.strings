@@ -1,4 +1,16 @@
 /* Analysis/AnomalyEngine.swift */
+
+/* Advisories executable version probing */
+"Identify executable versions" = "识别可执行文件版本";
+"Runs bounded local version checks for supported executables; inventory never leaves this Mac." = "对支持的可执行文件进行有界本地版本检查；软件清单不会离开此 Mac。";
+"Stop" = "停止";
+"Scan now" = "立即扫描";
+"Checked %lld of %lld supported executables" = "已检查 %lld/%lld 个支持的可执行文件";
+"%lld supported executable%@ found. Version checks are explicit and time-limited." = "找到 %lld 个支持的可执行文件。版本检查需要明确启动并受时间限制。";
+"No supported executable versions were found to identify." = "未找到可识别的支持可执行文件版本。";
+"Identified %lld of %lld executable versions; some remain unknown." = "已识别 %lld/%lld 个可执行文件版本；部分版本仍未知。";
+"Identified %lld of %lld executable versions." = "已识别 %lld/%lld 个可执行文件版本。";
+"Executable version output" = "可执行文件版本输出";
 "Traffic spike" = "流量激增";
 "Unusual number of destinations" = "目标数量异常";
 "First contact with domain" = "首次连接域名";

@@ -1,4 +1,16 @@
 /* Analysis/AnomalyEngine.swift */
+
+/* Advisories executable version probing */
+"Identify executable versions" = "Identificar versões de executáveis";
+"Runs bounded local version checks for supported executables; inventory never leaves this Mac." = "Verificações locais limitadas para executáveis suportados; o inventário nunca sai deste Mac.";
+"Stop" = "Parar";
+"Scan now" = "Analisar agora";
+"Checked %lld of %lld supported executables" = "Verificados %lld de %lld executáveis suportados";
+"%lld supported executable%@ found. Version checks are explicit and time-limited." = "Foram encontrados %lld executáveis suportados. As verificações de versão são explícitas e limitadas no tempo.";
+"No supported executable versions were found to identify." = "Não foram encontradas versões de executáveis suportados para identificar.";
+"Identified %lld of %lld executable versions; some remain unknown." = "Foram identificadas %lld de %lld versões de executáveis; algumas continuam desconhecidas.";
+"Identified %lld of %lld executable versions." = "Foram identificadas %lld de %lld versões de executáveis.";
+"Executable version output" = "Saída da versão do executável";
 "Traffic spike" = "Pico de tráfego";
 "Unusual number of destinations" = "Número invulgar de destinos";
 "First contact with domain" = "Primeiro contacto com o domínio";

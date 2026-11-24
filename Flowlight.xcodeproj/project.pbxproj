@@ -314,6 +314,7 @@
 		9814BB05A2FC8648EB62145C /* ResponseTransformRulesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8F8FB5C78D8391B25733C9B /* ResponseTransformRulesView.swift */; };
 		9891F943C7CAD36651D24774 /* ProtocolClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C533BB77B419198656C6284 /* ProtocolClassifier.swift */; };
 		9A03509ED600BF1065FD2800 /* MCPDomains.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D6CCA395BF33CDF9F92B725 /* MCPDomains.swift */; };
+		9A2551E7E7A49B1D44F80242 /* ExecutableVersionProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4CB94A18423972CE70E543 /* ExecutableVersionProbe.swift */; };
 		9B22FA903C576B32C9232523 /* DeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 638E7A9BEB644503868C49E9 /* DeviceTests.swift */; };
 		9BE0BB0A6D132461427E755B /* UpdateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D210A86033CB79C792000CA2 /* UpdateView.swift */; };
 		9D9CC413EDA13E69B872454F /* BlockRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80BC5E16F824FC642C12C8B0 /* BlockRules.swift */; };
@@ -324,6 +325,7 @@
 		A1DE70B1FFF145A8057E85C4 /* UpdateInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 121FF2EBC93394E8EDCFF0BF /* UpdateInstaller.swift */; };
 		A224249AD83D44E25C293EC3 /* HTTPStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E8974956FEBD82934CA1EB5 /* HTTPStream.swift */; };
 		A3417EC0EF2DD2A4D35CAAB5 /* ExportQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 719C08673D2446F21DAF9F54 /* ExportQueue.swift */; };
+		A3936E085D439C60794B097D /* ExecutableVersionProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4CB94A18423972CE70E543 /* ExecutableVersionProbe.swift */; };
 		A3FF156082D5E00D561A7099 /* InsightsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FA151AA64480DAACC602123 /* InsightsPanel.swift */; };
 		A48DC12BB97A0E5499A3D87D /* ExtensionTrafficSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95761708CD76CABDF0696BCE /* ExtensionTrafficSource.swift */; };
 		A4CEEDBC97449B58C674CD4F /* ProcessLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E489125D1DBF3EF98AEED4EB /* ProcessLookup.swift */; };
@@ -783,6 +785,7 @@
 		89C74F92FC42AE36F5D97F1F /* EnrichmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrichmentTests.swift; sourceTree = "<group>"; };
 		8ACA1ABA6B37B6457004C94A /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
 		8CB82D0B63E8C783DD0A4FB5 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		8D4CB94A18423972CE70E543 /* ExecutableVersionProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExecutableVersionProbe.swift; sourceTree = "<group>"; };
 		8E01AEB9AB4F8723FFFA4BFB /* ExportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportTests.swift; sourceTree = "<group>"; };
 		8EF576B7B41898D84B4E487F /* Info-AppStore.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info-AppStore.plist"; sourceTree = "<group>"; };
 		8F08D1913575FFC1F548CAB5 /* GuardrailsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuardrailsPane.swift; sourceTree = "<group>"; };
@@ -1134,6 +1137,7 @@
 				ABD4C8B6E3620F5E46C69434 /* BuiltInRulePacks.swift */,
 				9EC52100D779B101B1B2595F /* Coverage.swift */,
 				A62A00EA0C0D8B7844E6F7B2 /* DestinationProfile.swift */,
+				8D4CB94A18423972CE70E543 /* ExecutableVersionProbe.swift */,
 				2CC957336FC5BD77D7A81651 /* Focus.swift */,
 				D9195A6149AE1C6628A3E184 /* GuardrailStore.swift */,
 				F67F3203B4BE2D664F3B1EC9 /* InstalledApps.swift */,
@@ -1996,6 +2000,7 @@
 				CF8EE120DA5241445ECD1797 /* DeviceStore.swift in Sources */,
 				F782A1187A8564DA1C37EDC1 /* DevicesView.swift in Sources */,
 				2E690A1F45355F154A2EB37E /* DurableEventQueue.swift in Sources */,
+				A3936E085D439C60794B097D /* ExecutableVersionProbe.swift in Sources */,
 				65F6E16AC002847C032ECC48 /* ExportController.swift in Sources */,
 				3F90E760FD34949F451FBDF4 /* ExportDisclosure.swift in Sources */,
 				4BAEC22536747CFB9525934A /* ExportDisclosureSheet.swift in Sources */,
@@ -2225,6 +2230,7 @@
 				315C5531C14F1DDE99043A18 /* DeviceStore.swift in Sources */,
 				70CD0A27AAF526B9BB07BBAE /* DevicesView.swift in Sources */,
 				1C84600D9B2365A7905656B2 /* DurableEventQueue.swift in Sources */,
+				9A2551E7E7A49B1D44F80242 /* ExecutableVersionProbe.swift in Sources */,
 				9DA5CB6639FF673FC53D033A /* ExportController.swift in Sources */,
 				0567566CCFA1B23855C3C0F1 /* ExportDisclosure.swift in Sources */,
 				C49DD542101E64D0EEBD05E4 /* ExportDisclosureSheet.swift in Sources */,
@@ -2502,6 +2508,7 @@
 				PRODUCT_NAME = Flowlight;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) APP_STORE";
+				SWIFT_MODULE_NAME = Flowlight;
 				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
 			};
 			name = AppStore;
@@ -2881,6 +2888,7 @@
 				PRODUCT_NAME = Flowlight;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) APP_STORE";
+				SWIFT_MODULE_NAME = Flowlight;
 				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
 			};
 			name = Release;
@@ -3028,6 +3036,7 @@
 				PRODUCT_NAME = Flowlight;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) APP_STORE";
+				SWIFT_MODULE_NAME = Flowlight;
 				SWIFT_TREAT_WARNINGS_AS_ERRORS = YES;
 			};
 			name = Debug;
