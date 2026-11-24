@@ -28,6 +28,10 @@ OFFICIAL_PACK_PROVENANCE_SOURCE = SITE / "packs/v1/provenance"
 OFFICIAL_PACK_PROVENANCE_OUTPUT = OUT / "packs/v1/provenance"
 DOMAIN = "https://flowlight.xinbetween.com"
 OFFICIAL_PACK_PROVENANCE_URL = f"{DOMAIN}/packs/v1/provenance/"
+ADVISORY_CATALOG_SOURCE = SITE / "advisories/v1/catalog.json"
+ADVISORY_CATALOG_OUTPUT = OUT / "advisories/v1/catalog.json"
+ADVISORY_CATALOG_BUNDLED = ROOT / "Flowlight/Resources/Advisories/advisories.json"
+ADVISORY_CATALOG_URL = f"{DOMAIN}/advisories/v1/catalog.json"
 REQUIRED_PROVENANCE_PACK_IDS = {"official.advertising", "official.advertising-aggressive"}
 REPO = os.environ.get("GITHUB_REPO", "xinbetween/flowlight")
 DMG = f"https://github.com/{REPO}/releases/latest/download/Flowlight.dmg"
@@ -222,6 +226,24 @@ def publish_official_pack_outputs(
     )
     atomic_publish([(catalog_output, official_pack)], replace=replace)
     return official_pack, provenance_bytes
+
+
+def publish_advisory_catalog_output(
+    catalog_source=ADVISORY_CATALOG_SOURCE,
+    catalog_output=ADVISORY_CATALOG_OUTPUT,
+    bundled_catalog=ADVISORY_CATALOG_BUNDLED,
+    root=ROOT,
+    replace=os.replace,
+):
+    """Publish the exact signed advisory envelope without re-encoding it."""
+    for path in (catalog_source, bundled_catalog):
+        if path.is_symlink() or not path.is_file():
+            sys.exit(f"{display_path(path, root)} is missing or is not a regular file")
+    catalog = catalog_source.read_bytes()
+    if catalog != bundled_catalog.read_bytes():
+        sys.exit(f"{display_path(catalog_source, root)} differs from {display_path(bundled_catalog, root)}")
+    atomic_publish([(catalog_output, catalog)], replace=replace)
+    return catalog
 
 
 def counts():
@@ -527,6 +549,7 @@ def picker(langs, table, current, targets):
 
 def build():
     official_pack, provenance_bytes = publish_official_pack_outputs()
+    advisory_catalog = publish_advisory_catalog_output()
 
     css = (SITE / "site.css").read_text()
     # The stylesheet is one URL that never changes name, so a browser and the Pages CDN both keep serving the
@@ -640,6 +663,7 @@ def build():
     print(f"  /packs/v1/official.json → {OFFICIAL_PACK_OUTPUT.relative_to(ROOT)} ({len(official_pack)} bytes)")
     print(f"  /packs/v1/provenance/ → {OFFICIAL_PACK_PROVENANCE_OUTPUT.relative_to(ROOT)} "
           f"({len(provenance_bytes)} content-addressed file(s))")
+    print(f"  /advisories/v1/catalog.json → {ADVISORY_CATALOG_OUTPUT.relative_to(ROOT)} ({len(advisory_catalog)} bytes)")
 
 
 class Strings(dict):

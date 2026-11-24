@@ -119,3 +119,26 @@ jobs:
 
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+      - name: Verify the published advisory catalog
+        run: |
+          set -euo pipefail
+          URL="https://flowlight.xinbetween.com/advisories/v1/catalog.json"
+          for attempt in {1..10}; do
+            headers=$(mktemp)
+            payload=$(mktemp)
+            if curl --fail --silent --show-error --location --max-time 30 \
+              --dump-header "$headers" --output "$payload" "$URL"; then
+              mime=$(awk 'BEGIN {IGNORECASE=1} /^content-type:/ {print $2}' "$headers" | tr -d '\\r' | tail -n 1)
+              if [[ "$mime" == application/json* ]] && jq -e \
+                '.format == 1 and .payload.catalogID == "flowlight.advisories" and .payload.channel == "official" and .payload.sourceURL == "https://flowlight.xinbetween.com/advisories/v1/catalog.json" and (.signatures | length) > 0' \
+                "$payload" >/dev/null; then
+                rm -f "$headers" "$payload"
+                exit 0
+              fi
+            fi
+            rm -f "$headers" "$payload"
+            sleep 15
+          done
+          echo "::error::The published advisory catalog was not reachable as a valid JSON envelope."
+          exit 1
