@@ -99,20 +99,52 @@ enum InstalledApps {
     }
 
     static func scan(in searchPaths: [String], manager: FileManager = .default) -> ScanResult {
+        let result = scanAll(in: searchPaths, manager: manager)
+        var unique: [String: App] = [:]
+        for app in result.apps {
+            if let existing = unique[app.bundleID], existing.path <= app.path { continue }
+            unique[app.bundleID] = app
+        }
+        return ScanResult(apps: unique.values.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }, complete: result.complete)
+    }
+
+    /// Returns every distinct canonical bundle path for advisory inventory. The compatibility `scan` method above
+    /// retains one deterministic record per bundle ID for focus and Bluetooth callers.
+    static func scanAll(in searchPaths: [String], manager: FileManager = .default,
+                        maximumDepth: Int = 8, maximumVisits: Int = 50_000) -> ScanResult {
         var found: [String: App] = [:]
         var complete = true
         for directory in searchPaths {
             guard manager.fileExists(atPath: directory) else { continue }
+            let rootURL = URL(fileURLWithPath: directory).standardizedFileURL
             guard let enumerator = manager.enumerator(
-                at: URL(fileURLWithPath: directory),
-                includingPropertiesForKeys: [.isDirectoryKey, .isPackageKey],
+                at: rootURL,
+                includingPropertiesForKeys: [.isDirectoryKey, .isPackageKey, .isSymbolicLinkKey],
                 options: [.skipsHiddenFiles],
                 errorHandler: { _, _ in complete = false; return true }
             ) else {
                 complete = false
                 continue
             }
+            var visits = 0
             for case let url as URL in enumerator {
+                visits += 1
+                if visits > maximumVisits {
+                    complete = false
+                    break
+                }
+                guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+                      values.isSymbolicLink != true else {
+                    enumerator.skipDescendants()
+                    continue
+                }
+                if values.isDirectory == true,
+                   url.pathComponents.count - rootURL.pathComponents.count >= maximumDepth {
+                    enumerator.skipDescendants()
+                    continue
+                }
                 guard url.pathExtension.caseInsensitiveCompare("app") == .orderedSame else { continue }
                 enumerator.skipDescendants()
                 guard let bundle = Bundle(url: url), let id = bundle.bundleIdentifier, !id.isEmpty else {
@@ -127,16 +159,20 @@ enum InstalledApps {
                 let buildVersion = infoString(bundle, key: "CFBundleVersion")
                 let versionEvidence: VersionEvidence? = marketingVersion != nil || buildVersion != nil
                     ? .bundleInfoDictionary : nil
-                found[id] = App(name: name, bundleID: id, path: url.path, bluetoothPurpose: purpose,
-                                marketingVersion: marketingVersion, buildVersion: buildVersion,
-                                scanEvidence: .applicationBundle, versionEvidence: versionEvidence)
+                let canonicalPath = url.resolvingSymlinksInPath().standardizedFileURL.path
+                let key = "\(id.lowercased()):\(canonicalPath)"
+                found[key] = App(name: name, bundleID: id, path: canonicalPath, bluetoothPurpose: purpose,
+                                 marketingVersion: marketingVersion, buildVersion: buildVersion,
+                                 scanEvidence: .applicationBundle, versionEvidence: versionEvidence)
             }
         }
-        let result = ScanResult(
-            apps: found.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending },
+        return ScanResult(
+            apps: found.values.sorted {
+                let name = $0.name.localizedCaseInsensitiveCompare($1.name)
+                return name == .orderedAscending || (name == .orderedSame && $0.path < $1.path)
+            },
             complete: complete && !found.isEmpty
         )
-        return result
     }
 
     /// The applications built to use Bluetooth, as they say so themselves in their Info.plist.

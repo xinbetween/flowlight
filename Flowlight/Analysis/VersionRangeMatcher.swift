@@ -6,6 +6,15 @@ import Foundation
 /// compared only when every component is an unsigned decimal number. Unknown, empty, wildcard, or prerelease
 /// syntax is rejected rather than turned into a potentially false vulnerability finding.
 enum VersionRangeMatcher {
+    static func isUsable(version: String?, scheme: AdvisoryVersionScheme) -> Bool {
+        switch scheme {
+        case .numeric, .opaque:
+            return parse(version) != nil
+        case .semver:
+            return SemVer.parse(version) != nil
+        }
+    }
+
     static func matches(version: String?, range: AdvisoryVersionRange) -> Bool {
         guard let version = parse(version) else { return false }
         guard let startIncluding = bound(range.startIncluding) else { return false }

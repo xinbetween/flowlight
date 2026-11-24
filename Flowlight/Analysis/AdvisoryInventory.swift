@@ -86,7 +86,9 @@ struct AdvisoryArtifact: Equatable, Hashable, Sendable, Identifiable {
         "\(kind.rawValue):\(identifier.lowercased()):\(canonicalPath(path))"
     }
 
-    var hasVersionEvidence: Bool { version != nil && versionEvidence != nil }
+    var hasVersionEvidence: Bool {
+        version != nil && versionEvidence != nil && VersionRangeMatcher.isUsable(version: version, scheme: versionScheme)
+    }
 
     private func canonicalPath(_ path: String) -> String {
         URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
@@ -151,6 +153,8 @@ struct AdvisoryInventoryScanner {
         var selectedProjectRoots: [AdvisoryInventoryRoot]
         var maximumProjectDepth: Int = 4
         var maximumProjectVisits: Int = 4_000
+        var maximumHomebrewDepth: Int = 6
+        var maximumHomebrewVisits: Int = 20_000
         var maximumPackageManifestBytes: Int = 1_048_576
 
         static var `default`: Configuration {
@@ -210,7 +214,7 @@ struct AdvisoryInventoryScanner {
     }
 
     private func scanApplications() -> (artifacts: [AdvisoryArtifact], source: AdvisoryInventorySourceResult) {
-        let result = InstalledApps.scan(in: configuration.applicationRoots, manager: fileManager)
+        let result = InstalledApps.scanAll(in: configuration.applicationRoots, manager: fileManager)
         let artifacts = result.apps.map { app in
             AdvisoryArtifact(
                 kind: .application,
@@ -327,9 +331,21 @@ struct AdvisoryInventoryScanner {
                 at: caskroom, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
                 options: [], errorHandler: { _, _ in complete = false; return true }
             ) else { complete = false; continue }
+            var visits = 0
+            let caskRootDepth = caskroom.pathComponents.count
             for case let url as URL in enumerator {
+                visits += 1
+                if visits > configuration.maximumHomebrewVisits {
+                    complete = false
+                    break
+                }
                 guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
                       values.isSymbolicLink != true else {
+                    enumerator.skipDescendants()
+                    continue
+                }
+                if values.isDirectory == true,
+                   url.pathComponents.count - caskRootDepth >= configuration.maximumHomebrewDepth {
                     enumerator.skipDescendants()
                     continue
                 }
@@ -361,10 +377,7 @@ struct AdvisoryInventoryScanner {
     }
 
     private func readHomebrewReceipt(_ url: URL) -> (name: String?, version: String?)? {
-        guard let data = try? Data(contentsOf: url, options: [.mappedIfSafe]),
-              data.count <= configuration.maximumPackageManifestBytes,
-              let object = try? JSONSerialization.jsonObject(with: data),
-              let dictionary = object as? [String: Any] else { return nil }
+        guard let dictionary = readBoundedJSONDictionary(url) else { return nil }
         let source = dictionary["source"] as? [String: Any]
         let specs = source?["specs"] as? [String: Any]
         let name = ((dictionary["name"] as? String) ?? (specs?["name"] as? String))?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -471,11 +484,19 @@ struct AdvisoryInventoryScanner {
                 : L("The selected folder was only partially inspected."))))
     }
 
-    private func readPackage(_ url: URL) -> (name: String?, version: String?)? {
-        guard let data = try? Data(contentsOf: url, options: [.mappedIfSafe]),
-              data.count <= configuration.maximumPackageManifestBytes,
+    private func readBoundedJSONDictionary(_ url: URL) -> [String: Any]? {
+        guard let attributes = try? fileManager.attributesOfItem(atPath: url.path),
+              let size = attributes[.size] as? NSNumber,
+              size.int64Value >= 0,
+              size.int64Value <= Int64(configuration.maximumPackageManifestBytes),
+              let data = try? Data(contentsOf: url, options: [.mappedIfSafe]),
               let object = try? JSONSerialization.jsonObject(with: data),
               let dictionary = object as? [String: Any] else { return nil }
+        return dictionary
+    }
+
+    private func readPackage(_ url: URL) -> (name: String?, version: String?)? {
+        guard let dictionary = readBoundedJSONDictionary(url) else { return nil }
         let name = (dictionary["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
         let version = (dictionary["version"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let name, !name.isEmpty else { return nil }

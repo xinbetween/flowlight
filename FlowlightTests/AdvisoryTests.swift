@@ -88,6 +88,55 @@ final class AdvisoryTests: XCTestCase {
         XCTAssertFalse(advisory.matches(wrongIdentity), "same text in another identity is not a match")
     }
 
+    func testBundledAdvisoryCatalogBootstrapsWithProductionTrust() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let url = root.appendingPathComponent("Flowlight/Resources/Advisories/advisories.json")
+        let data = try Data(contentsOf: url)
+
+        XCTAssertNoThrow(try AdvisoryCatalogVerifier.validateStrictJSONSyntax(data))
+        XCTAssertNoThrow(try JSONDecoder().decode(AdvisoryCatalogEnvelope.self, from: data))
+        XCTAssertNoThrow(try AdvisoryCatalogVerifier.verify(data: data, now: 1_795_000_000))
+    }
+
+    func testNonemptySignedCatalogUsesWireSchemaKeys() throws {
+        let key = P256.Signing.PrivateKey()
+        let match = AdvisoryCPEMatch(criteria: "cpe:2.3:a:example:tool:*:*:*:*:*:*:*:*",
+                                      targets: [AdvisoryTarget(kind: .executable, identifier: "curl")],
+                                      versionStartIncluding: "1.0.0")
+        let advisory = AdvisoryCatalogWireAdvisory(
+            id: "CVE-2099-0100",
+            summary: "Test advisory",
+            configurations: [AdvisoryConfiguration(nodes: [AdvisoryNode(matches: [match])])]
+        )
+        let payload = AdvisoryCatalogPayload(
+            catalogID: AdvisoryCatalogVerifier.catalogID,
+            channel: AdvisoryCatalogVerifier.channel,
+            sourceURL: AdvisoryCatalogVerifier.sourceURL,
+            sequence: 1,
+            issuedAt: 1_799_000_000,
+            expiresAt: 1_900_000_000,
+            publisher: AdvisoryCatalogVerifier.publisher,
+            advisories: [advisory]
+        )
+        var envelope = AdvisoryCatalogEnvelope(format: AdvisoryCatalogVerifier.catalogFormat, payload: payload, signatures: [])
+        let signature = try key.signature(for: AdvisoryCatalogVerifier.canonicalPayload(for: envelope))
+        envelope.signatures = [AdvisoryCatalogSignature(
+            algorithm: AdvisoryCatalogVerifier.signatureAlgorithm,
+            keyID: "test-key",
+            value: signature.derRepresentation.base64EncodedString()
+        )]
+        let signer = AdvisoryCatalogTrustedSigner(
+            keyID: "test-key", publisher: AdvisoryCatalogVerifier.publisher,
+            catalogID: AdvisoryCatalogVerifier.catalogID, advisoryIDPrefix: "CVE-",
+            publicKeyPEM: key.publicKey.pemRepresentation,
+            validFrom: 1_790_000_000, validUntil: 1_900_000_000
+        )
+
+        XCTAssertNoThrow(try AdvisoryCatalogVerifier.verify(
+            data: JSONEncoder().encode(envelope), trustedSigners: [signer], now: 1_800_000_000
+        ))
+    }
+
     func testTypedTargetCatalogRoundTripsAlongsideLegacyBundleIDs() throws {
         let typed = AdvisoryCPEMatch(criteria: "cpe:2.3:a:example:tool:*:*:*:*:*:*:*:*",
                                       targets: [AdvisoryTarget(kind: .executable, identifier: "curl")])

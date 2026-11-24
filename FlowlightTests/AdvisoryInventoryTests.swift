@@ -45,10 +45,31 @@ final class AdvisoryInventoryTests: XCTestCase {
         XCTAssertEqual(result.artifacts.filter { $0.kind == .homebrewFormula }.map(\.identifier), ["curl"])
         XCTAssertEqual(result.artifacts.filter { $0.kind == .homebrewCask }.map(\.identifier), ["wget"])
         XCTAssertEqual(result.artifacts.filter { $0.kind == .nodePackage }.map(\.identifier), ["curl"])
-        XCTAssertEqual(result.artifacts.first(where: { $0.kind == .executable })?.version, nil)
+        XCTAssertNil(result.artifacts.first(where: { $0.kind == .executable })?.version)
         XCTAssertEqual(result.artifacts.first(where: { $0.kind == .homebrewFormula })?.versionEvidence, .homebrewInstallReceipt)
         XCTAssertEqual(result.artifacts.first(where: { $0.kind == .nodePackage })?.versionEvidence, .packageJSON)
         XCTAssertEqual(Set(result.artifacts.map(\.kind)).count, 5)
+    }
+
+    func testApplicationCopiesWithSameBundleIDRemainSeparateForAdvisories() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-inventory-copies-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let paths = [root.appendingPathComponent("A/Example.app/Contents"), root.appendingPathComponent("B/Example.app/Contents")]
+        for (index, contents) in paths.enumerated() {
+            try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+            let plist: [String: Any] = ["CFBundleIdentifier": "com.example.Duplicate", "CFBundleName": "Example \(index)", "CFBundleShortVersionString": "\(index + 1).0.0"]
+            try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+                .write(to: contents.appendingPathComponent("Info.plist"))
+        }
+
+        let config = AdvisoryInventoryScanner.Configuration(
+            applicationRoots: [root.path], executableRoots: [], homebrewPrefixes: [], selectedProjectRoots: []
+        )
+        let apps = AdvisoryInventoryScanner(configuration: config).scan().artifacts.filter { $0.kind == .application }
+
+        XCTAssertEqual(apps.count, 2)
+        XCTAssertEqual(Set(apps.map(\.identifier)), ["com.example.Duplicate"])
+        XCTAssertEqual(Set(apps.compactMap(\.version)), ["1.0.0", "2.0.0"])
     }
 
     func testScannerDoesNotTreatCellarDirectoryNameAsVersion() throws {
@@ -58,9 +79,7 @@ final class AdvisoryInventoryTests: XCTestCase {
         try FileManager.default.createDirectory(at: receipt.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("{\"name\":\"tool\"}".utf8).write(to: receipt)
 
-        let config = AdvisoryInventoryScanner.Configuration(
-            applicationRoots: [], executableRoots: [], homebrewPrefixes: [root.path], selectedProjectRoots: []
-        )
+        let config = AdvisoryInventoryScanner.Configuration(applicationRoots: [], executableRoots: [], homebrewPrefixes: [root.path], selectedProjectRoots: [])
         let result = AdvisoryInventoryScanner(configuration: config).scan()
 
         XCTAssertTrue(result.artifacts.filter { $0.kind == .homebrewFormula }.isEmpty)
@@ -73,14 +92,10 @@ final class AdvisoryInventoryTests: XCTestCase {
         let malformed = root.appendingPathComponent("node_modules/broken/package.json")
         try FileManager.default.createDirectory(at: packageDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: malformed.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data("{\"name\":\"example\",\"version\":\"2.0.0\"}".utf8)
-            .write(to: packageDirectory.appendingPathComponent("package.json"))
+        try Data("{\"name\":\"example\",\"version\":\"2.0.0\"}".utf8).write(to: packageDirectory.appendingPathComponent("package.json"))
         try Data("not json".utf8).write(to: malformed)
 
-        let config = AdvisoryInventoryScanner.Configuration(
-            applicationRoots: [], executableRoots: [], homebrewPrefixes: [],
-            selectedProjectRoots: [AdvisoryInventoryRoot(path: root.path, userSelected: true)]
-        )
+        let config = AdvisoryInventoryScanner.Configuration(applicationRoots: [], executableRoots: [], homebrewPrefixes: [], selectedProjectRoots: [AdvisoryInventoryRoot(path: root.path, userSelected: true)])
         let result = AdvisoryInventoryScanner(configuration: config).scan()
         let source = try XCTUnwrap(result.sources.first(where: { $0.source == root.path }))
 
@@ -91,15 +106,9 @@ final class AdvisoryInventoryTests: XCTestCase {
 
     func testSameNameAcrossKindsHasDistinctStableIDs() throws {
         let artifacts = [
-            AdvisoryArtifact(kind: .executable, identifier: "curl", name: "curl", path: "/usr/bin/curl",
-                             version: nil, versionScheme: .opaque, identityEvidence: .executablePath,
-                             versionEvidence: nil, source: "Executable path", iconPath: nil),
-            AdvisoryArtifact(kind: .homebrewFormula, identifier: "curl", name: "curl", path: "/opt/homebrew/Cellar/curl/1",
-                             version: "1", versionScheme: .opaque, identityEvidence: .homebrewReceipt,
-                             versionEvidence: .homebrewInstallReceipt, source: "Homebrew", iconPath: nil),
-            AdvisoryArtifact(kind: .nodePackage, identifier: "curl", name: "curl", path: "/tmp/node_modules/curl",
-                             version: "1.0.0", versionScheme: .semver, identityEvidence: .packageManifest,
-                             versionEvidence: .packageJSON, source: "package.json", iconPath: nil),
+            AdvisoryArtifact(kind: .executable, identifier: "curl", name: "curl", path: "/usr/bin/curl", version: nil, versionScheme: .opaque, identityEvidence: .executablePath, versionEvidence: nil, source: "Executable path", iconPath: nil),
+            AdvisoryArtifact(kind: .homebrewFormula, identifier: "curl", name: "curl", path: "/opt/homebrew/Cellar/curl/1", version: "1", versionScheme: .opaque, identityEvidence: .homebrewReceipt, versionEvidence: .homebrewInstallReceipt, source: "Homebrew", iconPath: nil),
+            AdvisoryArtifact(kind: .nodePackage, identifier: "curl", name: "curl", path: "/tmp/node_modules/curl", version: "1.0.0", versionScheme: .semver, identityEvidence: .packageManifest, versionEvidence: .packageJSON, source: "package.json", iconPath: nil),
         ]
 
         XCTAssertEqual(Set(artifacts.map(\.id)).count, 3)

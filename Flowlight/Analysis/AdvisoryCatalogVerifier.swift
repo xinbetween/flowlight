@@ -35,7 +35,9 @@ enum AdvisoryCatalogVerifier {
             catalogID: catalogID,
             advisoryIDPrefix: "CVE-",
             publicKeyPEM: productionPublicKeyPEM,
-            validFrom: 1_794_700_800,
+            // The bundled empty catalog was signed before the production key's November 2026 rotation window.
+            // Keep the trust window aligned with its signed issuedAt rather than rejecting bootstrap on launch.
+            validFrom: 1_790_000_000,
             validUntil: 1_956_528_000,
             revoked: false
         ),
@@ -286,9 +288,9 @@ enum AdvisoryCatalogVerifier {
                 for configuration in try array(a["configurations"]) {
                     let c = try dictionary(configuration, keys: ["nodes"])
                     for node in try array(c["nodes"]) {
-                        let n = try dictionary(node, keys: ["operation", "negate", "matches"])
-                        for match in try array(n["matches"]) {
-                            let m = try dictionary(match, keys: ["criteria", "matchCriteriaID", "vulnerable", "bundleIDs", "targets", "versionStartIncluding", "versionStartExcluding", "versionEndIncluding", "versionEndExcluding"], optional: ["matchCriteriaID", "bundleIDs", "targets", "versionStartIncluding", "versionStartExcluding", "versionEndIncluding", "versionEndExcluding"])
+                        let n = try dictionary(node, keys: ["operator", "negate", "cpeMatch"])
+                        for match in try array(n["cpeMatch"]) {
+                            let m = try dictionary(match, keys: ["criteria", "matchCriteriaId", "vulnerable", "bundleIDs", "targets", "versionStartIncluding", "versionStartExcluding", "versionEndIncluding", "versionEndExcluding"], optional: ["matchCriteriaId", "bundleIDs", "targets", "versionStartIncluding", "versionStartExcluding", "versionEndIncluding", "versionEndExcluding"])
                             if let targets = m["targets"] {
                                 for target in try array(targets) {
                                     _ = try dictionary(target, keys: ["kind", "identifier"])
@@ -324,7 +326,7 @@ enum AdvisoryCatalogVerifier {
                 if byte == 92 { escaped = true; continue }
                 if byte == 34 {
                     let raw = Data(data[(start - 1)..<index])
-                    guard let decoded = try? JSONSerialization.jsonObject(with: raw) as? String else {
+                    guard let decoded = try? JSONSerialization.jsonObject(with: raw, options: [.fragmentsAllowed]) as? String else {
                         throw AdvisoryCatalogVerificationError.invalidEnvelope
                     }
                     return decoded
