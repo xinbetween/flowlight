@@ -49,6 +49,7 @@ enum AdvisoryVersionEvidence: String, Codable, Hashable, Sendable {
     case bundleInfoDictionary
     case homebrewInstallReceipt
     case packageJSON
+    case executableVersionProbe
 }
 
 private enum BoundedJSONReadResult {

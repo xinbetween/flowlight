@@ -113,4 +113,109 @@ final class AdvisoryInventoryTests: XCTestCase {
 
         XCTAssertEqual(Set(artifacts.map(\.id)).count, 3)
     }
+
+    func testExecutableVersionOutputRequiresOneUsableNumericToken() {
+        XCTAssertEqual(ExecutableVersionProbe.parseVersion(from: "curl 8.10.1\n"), "8.10.1")
+        XCTAssertEqual(ExecutableVersionProbe.parseVersion(from: "v2.43.0"), "2.43.0")
+        XCTAssertNil(ExecutableVersionProbe.parseVersion(from: "tool version unknown"))
+        XCTAssertNil(ExecutableVersionProbe.parseVersion(from: "tool 1.2.3 and library 4.5.6"))
+    }
+
+    func testExecutableVersionProbeIsExplicitAndAddsEvidence() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-probe-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let executable = root.appendingPathComponent("curl")
+        try Data("not executed".utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+        let artifact = AdvisoryArtifact(kind: .executable, identifier: "curl", name: "curl", path: executable.standardizedFileURL.path,
+                                        version: nil, versionScheme: .opaque, identityEvidence: .executablePath,
+                                        versionEvidence: nil, source: "Executable path", iconPath: executable.path)
+        let recorder = ProbeRecorder()
+        let probe = ExecutableVersionProbe(
+            runner: { url, arguments, _ in
+                recorder.record(url: url.path, arguments: arguments)
+                return ExecutableVersionProbe.RawResult(output: Data("curl 8.10.1\n".utf8), exitCode: 0)
+            },
+            pathValidator: { _ in true }
+        )
+
+        let result = await probe.probe(artifact)
+
+        XCTAssertEqual(result, .init(status: .found, version: "8.10.1"))
+        XCTAssertEqual(recorder.path, executable.standardizedFileURL.path)
+        XCTAssertEqual(recorder.arguments, ["--version"])
+        var enriched = artifact
+        if result.status == .found {
+            enriched.version = result.version
+            enriched.versionEvidence = .executableVersionProbe
+        }
+        XCTAssertTrue(enriched.hasVersionEvidence)
+        XCTAssertEqual(enriched.id, artifact.id)
+    }
+
+    func testDefaultProbeCanReadAKnownSystemExecutableVersion() async throws {
+        let path = "/usr/bin/curl"
+        try XCTSkipUnless(FileManager.default.isExecutableFile(atPath: path))
+        let artifact = AdvisoryArtifact(kind: .executable, identifier: "curl", name: "curl", path: path,
+                                        version: nil, versionScheme: .opaque, identityEvidence: .executablePath,
+                                        versionEvidence: nil, source: "Executable path", iconPath: path)
+        let probe = ExecutableVersionProbe(configuration: .init(timeout: 2.0))
+
+        let result = await probe.probe(artifact)
+
+        XCTAssertEqual(result.status, .found)
+        XCTAssertNotNil(result.version)
+    }
+
+    func testDefaultProbeTimesOutWithoutWaitingForChildProcesses() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-probe-timeout-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let executable = root.appendingPathComponent("curl")
+        try Data("#!/bin/sh\n/bin/sleep 5\n".utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+        let artifact = AdvisoryArtifact(kind: .executable, identifier: "curl", name: "curl", path: executable.path,
+                                        version: nil, versionScheme: .opaque, identityEvidence: .executablePath,
+                                        versionEvidence: nil, source: "Executable path", iconPath: executable.path)
+        let probe = ExecutableVersionProbe(configuration: .init(timeout: 0.05, terminationGrace: 0.05))
+        let started = Date()
+
+        let result = await probe.probe(artifact)
+
+        XCTAssertEqual(result.status, .timedOut)
+        XCTAssertLessThan(Date().timeIntervalSince(started), 2.0)
+    }
+
+    func testUnsupportedExecutableIsNotLaunched() async throws {
+        let recorder = ProbeRecorder()
+        let artifact = AdvisoryArtifact(kind: .executable, identifier: "custom-tool", name: "custom-tool", path: "/usr/bin/custom-tool",
+                                        version: nil, versionScheme: .opaque, identityEvidence: .executablePath,
+                                        versionEvidence: nil, source: "Executable path", iconPath: nil)
+        let probe = ExecutableVersionProbe(
+            runner: { _, _, _ in
+                recorder.record(url: "unexpected", arguments: [])
+                return ExecutableVersionProbe.RawResult(output: Data("1.0.0".utf8), exitCode: 0)
+            },
+            pathValidator: { _ in true }
+        )
+
+        let result = await probe.probe(artifact)
+
+        XCTAssertEqual(result, .notAttempted)
+        XCTAssertNil(recorder.path)
+    }
+}
+
+private final class ProbeRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private(set) var path: String?
+    private(set) var arguments: [String]?
+
+    func record(url: String, arguments: [String]) {
+        lock.lock()
+        path = url
+        self.arguments = arguments
+        lock.unlock()
+    }
 }

@@ -9,7 +9,12 @@ struct AdvisoriesView: View {
     @State private var sources: [AdvisoryInventorySourceResult] = []
     @State private var scanComplete = false
     @State private var scanning = false
+    @State private var probingVersions = false
+    @State private var probeProgress = 0
+    @State private var probeTotal = 0
+    @State private var probeSummary: String?
     @State private var refreshID = 0
+    @State private var probeRunID: UUID?
     @State private var selectedArtifactID: String?
     @State private var statusFilter: StatusFilter = .all
     @State private var kindFilter: KindFilter = .all
@@ -94,6 +99,11 @@ struct AdvisoriesView: View {
         .navigationSubtitle(navigationSubtitle)
         .toolbar { toolbar }
         .task(id: refreshID) { await scan() }
+        .task(id: probeRunID) {
+            guard let probeRunID else { return }
+            await identifyVersions(runID: probeRunID)
+        }
+        .onDisappear { probeRunID = nil }
         .sheet(item: selectedBinding) { row in
             AdvisoryDetailView(row: row, catalogState: store.catalogState)
         }
@@ -120,7 +130,7 @@ struct AdvisoriesView: View {
             Button { refreshID += 1 } label: {
                 Label(L("Rescan software"), systemImage: "arrow.clockwise")
             }
-            .disabled(scanning)
+            .disabled(scanning || probingVersions)
             .accessibilityIdentifier("advisories.rescan")
             .help(L("Rescan accessible local software and selected project folders"))
 
@@ -136,6 +146,7 @@ struct AdvisoriesView: View {
     private func content(height: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: Spacing.m) {
             catalogContext
+            versionProbeCard
             summary
             HStack(spacing: Spacing.s) {
                 Picker(L("Status"), selection: $statusFilter) {
@@ -157,7 +168,7 @@ struct AdvisoriesView: View {
 
             Divider()
 
-            if !scanComplete {
+            if !scanComplete || sources.contains(where: { !$0.complete }) {
                 VStack(alignment: .leading, spacing: 4) {
                     Label(L("This inventory may be incomplete. Only bounded, accessible sources are shown; no home-directory crawl is performed."),
                           systemImage: "exclamationmark.triangle")
@@ -186,6 +197,49 @@ struct AdvisoriesView: View {
             }
         }
         .padding()
+    }
+
+    private var versionProbeCard: some View {
+        let eligible = artifacts.filter { ExecutableVersionProbe.isEligible($0) }.count
+        return VStack(alignment: .leading, spacing: Spacing.s) {
+            HStack(alignment: .top, spacing: Spacing.s) {
+                Image(systemName: "terminal").foregroundStyle(FL.accent).frame(width: 20)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(L("Identify executable versions")).font(.callout.weight(.medium))
+                    Text(L("Runs bounded local version checks for supported executables; inventory never leaves this Mac."))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: Spacing.s)
+                if probingVersions {
+                    Button(L("Stop")) { probeRunID = nil }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("advisories.version-probe.stop")
+                } else {
+                    Button(L("Scan now")) { probeRunID = UUID() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(scanning || eligible == 0)
+                        .accessibilityIdentifier("advisories.version-probe.start")
+                }
+            }
+            if probingVersions {
+                ProgressView(value: Double(probeProgress), total: Double(max(probeTotal, 1)))
+                    .accessibilityIdentifier("advisories.version-probe.progress")
+                Text(L("Checked %lld of %lld supported executables", probeProgress, probeTotal))
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if let probeSummary {
+                Text(probeSummary)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("advisories.version-probe.summary")
+            } else {
+                Text(L("%lld supported executable%@ found. Version checks are explicit and time-limited.", eligible, eligible == 1 ? "" : "s"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.s)
+        .flCard(radius: Radius.chip)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("advisories.version-probe")
     }
 
     private var catalogContext: some View {
@@ -334,6 +388,7 @@ struct AdvisoriesView: View {
         case .bundleInfoDictionary: return L("Info.plist")
         case .homebrewInstallReceipt: return L("Homebrew receipt")
         case .packageJSON: return L("package.json")
+        case .executableVersionProbe: return L("Executable version output")
         case nil: return L("path only")
         }
     }
@@ -357,6 +412,7 @@ struct AdvisoriesView: View {
 
     private func scan() async {
         scanning = true
+        defer { scanning = false }
         let result = await Task.detached(priority: .utility) {
             AdvisoryInventoryScanner().scan()
         }.value
@@ -364,7 +420,45 @@ struct AdvisoriesView: View {
         artifacts = result.artifacts
         sources = result.sources
         scanComplete = result.complete
-        scanning = false
+        probeSummary = nil
+    }
+
+    private func identifyVersions(runID: UUID) async {
+        guard !scanning else { return }
+        let candidates = artifacts.filter { ExecutableVersionProbe.isEligible($0) }
+        let probe = ExecutableVersionProbe()
+        probeProgress = 0
+        probeTotal = min(candidates.count, probe.maximumProbes)
+        probingVersions = true
+        defer {
+            probingVersions = false
+            if probeRunID == runID { probeRunID = nil }
+        }
+        guard !candidates.isEmpty else {
+            probeSummary = L("No supported executable versions were found to identify.")
+            return
+        }
+
+        var found = 0
+        var attempted = 0
+        for candidate in candidates.prefix(probe.maximumProbes) {
+            guard !Task.isCancelled else { break }
+            let result = await probe.probe(candidate)
+            attempted += 1
+            if result.status == .found, let version = result.version,
+               let index = artifacts.firstIndex(where: { $0.id == candidate.id }) {
+                artifacts[index].version = version
+                artifacts[index].versionEvidence = .executableVersionProbe
+                artifacts[index].versionScheme = .opaque
+                found += 1
+            }
+            probeProgress = attempted
+        }
+        if Task.isCancelled || attempted < candidates.count {
+            probeSummary = L("Identified %lld of %lld executable versions; some remain unknown.", found, candidates.count)
+        } else {
+            probeSummary = L("Identified %lld of %lld executable versions.", found, candidates.count)
+        }
     }
 }
 
@@ -437,6 +531,7 @@ private struct AdvisoryDetailView: View {
         case .bundleInfoDictionary: return L("Info.plist")
         case .homebrewInstallReceipt: return L("Homebrew install receipt")
         case .packageJSON: return L("package.json")
+        case .executableVersionProbe: return L("Executable version output")
         case nil: return L("identity/path only")
         }
     }
