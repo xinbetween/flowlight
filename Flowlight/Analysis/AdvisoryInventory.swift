@@ -50,6 +50,16 @@ enum AdvisoryVersionEvidence: String, Codable, Hashable, Sendable {
     case packageJSON
 }
 
+private enum BoundedJSONReadResult {
+    case dictionary([String: Any])
+    case unavailable
+}
+
+private enum HomebrewReceiptReadResult {
+    case receipt(name: String, version: String)
+    case unavailable
+}
+
 /// A typed identity for one local software artifact. `identifier` is a catalog coordinate, not a display name.
 struct AdvisoryArtifact: Equatable, Hashable, Sendable, Identifiable {
     var kind: AdvisoryArtifactKind
@@ -304,8 +314,11 @@ struct AdvisoryInventoryScanner {
                     for versionDirectory in versions {
                         guard (try? versionDirectory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
                         let receiptURL = versionDirectory.appendingPathComponent("INSTALL_RECEIPT.json")
-                        guard let receipt = readHomebrewReceipt(receiptURL),
-                              let name = receipt.name, let version = receipt.version else { continue }
+                        guard fileManager.fileExists(atPath: receiptURL.path) else { continue }
+                        guard case let .receipt(name, version) = readHomebrewReceipt(receiptURL) else {
+                            complete = false
+                            continue
+                        }
                         let canonical = versionDirectory.resolvingSymlinksInPath().standardizedFileURL.path
                         let key = "formula:\(name.lowercased()):\(canonical)"
                         guard seen.insert(key).inserted else { continue }
@@ -346,13 +359,16 @@ struct AdvisoryInventoryScanner {
                 }
                 if values.isDirectory == true,
                    url.pathComponents.count - caskRootDepth >= configuration.maximumHomebrewDepth {
+                    complete = false
                     enumerator.skipDescendants()
                     continue
                 }
                 guard url.lastPathComponent == "INSTALL_RECEIPT.json" else { continue }
                 let receiptURL = url
-                guard let receipt = readHomebrewReceipt(receiptURL),
-                      let name = receipt.name, let version = receipt.version else { continue }
+                guard case let .receipt(name, version) = readHomebrewReceipt(receiptURL) else {
+                    complete = false
+                    continue
+                }
                 let caskPath = receiptURL.deletingLastPathComponent().deletingLastPathComponent()
                 let canonical = caskPath.resolvingSymlinksInPath().standardizedFileURL.path
                 let key = "cask:\(name.lowercased()):\(canonical)"
@@ -376,14 +392,14 @@ struct AdvisoryInventoryScanner {
             detail: complete ? nil : L("One or more Homebrew locations could not be read.")))
     }
 
-    private func readHomebrewReceipt(_ url: URL) -> (name: String?, version: String?)? {
-        guard let dictionary = readBoundedJSONDictionary(url) else { return nil }
+    private func readHomebrewReceipt(_ url: URL) -> HomebrewReceiptReadResult {
+        guard case let .dictionary(dictionary) = readBoundedJSONDictionary(url) else { return .unavailable }
         let source = dictionary["source"] as? [String: Any]
         let specs = source?["specs"] as? [String: Any]
         let name = ((dictionary["name"] as? String) ?? (specs?["name"] as? String))?.trimmingCharacters(in: .whitespacesAndNewlines)
         let version = ((dictionary["version"] as? String) ?? (specs?["version"] as? String))?.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let name, !name.isEmpty, let version, !version.isEmpty else { return nil }
-        return (name, version)
+        guard let name, !name.isEmpty, let version, !version.isEmpty else { return .unavailable }
+        return .receipt(name: name, version: version)
     }
 
     private func scanNodePackages() -> (artifacts: [AdvisoryArtifact], sources: [AdvisoryInventorySourceResult]) {
@@ -450,7 +466,10 @@ struct AdvisoryInventoryScanner {
             }
             let relativeDepth = url.pathComponents.count - rootURL.pathComponents.count
             if values.isDirectory == true {
-                if relativeDepth >= configuration.maximumProjectDepth || shouldSkipProjectDirectory(url.lastPathComponent) {
+                if relativeDepth >= configuration.maximumProjectDepth {
+                    complete = false
+                    enumerator.skipDescendants()
+                } else if shouldSkipProjectDirectory(url.lastPathComponent) {
                     enumerator.skipDescendants()
                 }
                 continue
@@ -484,19 +503,26 @@ struct AdvisoryInventoryScanner {
                 : L("The selected folder was only partially inspected."))))
     }
 
-    private func readBoundedJSONDictionary(_ url: URL) -> [String: Any]? {
-        guard let attributes = try? fileManager.attributesOfItem(atPath: url.path),
-              let size = attributes[.size] as? NSNumber,
-              size.int64Value >= 0,
-              size.int64Value <= Int64(configuration.maximumPackageManifestBytes),
-              let data = try? Data(contentsOf: url, options: [.mappedIfSafe]),
-              let object = try? JSONSerialization.jsonObject(with: data),
-              let dictionary = object as? [String: Any] else { return nil }
-        return dictionary
+    private func readBoundedJSONDictionary(_ url: URL) -> BoundedJSONReadResult {
+        let limit = configuration.maximumPackageManifestBytes
+        guard limit >= 0, let handle = try? FileHandle(forReadingFrom: url) else { return .unavailable }
+        defer { try? handle.close() }
+        do {
+            // Read from the already-open descriptor and request only one byte beyond the limit. This
+            // keeps the memory bound valid even if a writable project or Homebrew directory replaces
+            // or grows the manifest after discovery.
+            let data = try handle.read(upToCount: limit + 1) ?? Data()
+            guard data.count <= limit,
+                  let object = try? JSONSerialization.jsonObject(with: data),
+                  let dictionary = object as? [String: Any] else { return .unavailable }
+            return .dictionary(dictionary)
+        } catch {
+            return .unavailable
+        }
     }
 
     private func readPackage(_ url: URL) -> (name: String?, version: String?)? {
-        guard let dictionary = readBoundedJSONDictionary(url) else { return nil }
+        guard case let .dictionary(dictionary) = readBoundedJSONDictionary(url) else { return nil }
         let name = (dictionary["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
         let version = (dictionary["version"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let name, !name.isEmpty else { return nil }

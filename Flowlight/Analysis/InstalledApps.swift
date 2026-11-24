@@ -142,6 +142,7 @@ enum InstalledApps {
                 }
                 if values.isDirectory == true,
                    url.pathComponents.count - rootURL.pathComponents.count >= maximumDepth {
+                    complete = false
                     enumerator.skipDescendants()
                     continue
                 }
