@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 /// The kinds of local software artifacts that can be assessed without sending an inventory off the Mac.
@@ -505,8 +506,20 @@ struct AdvisoryInventoryScanner {
 
     private func readBoundedJSONDictionary(_ url: URL) -> BoundedJSONReadResult {
         let limit = configuration.maximumPackageManifestBytes
-        guard limit >= 0, let handle = try? FileHandle(forReadingFrom: url) else { return .unavailable }
-        defer { try? handle.close() }
+        guard limit >= 0 else { return .unavailable }
+
+        // Open without following symlinks, then validate the descriptor itself. Checking the URL before
+        // opening is not sufficient: a selected project or Homebrew prefix can replace a regular file
+        // with a FIFO between the check and the read, which would otherwise block the scan indefinitely.
+        let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+        guard descriptor >= 0 else { return .unavailable }
+        var fileStatus = stat()
+        guard Darwin.fstat(descriptor, &fileStatus) == 0,
+              (fileStatus.st_mode & S_IFMT) == S_IFREG else {
+            _ = Darwin.close(descriptor)
+            return .unavailable
+        }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
         do {
             // Read from the already-open descriptor and request only one byte beyond the limit. This
             // keeps the memory bound valid even if a writable project or Homebrew directory replaces
