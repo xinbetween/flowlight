@@ -211,6 +211,14 @@ extension FeatureGuide {
             keywords: ["delete", "database", "retention", "privacy", "clear", "storage", "disk"]),
 
         FeatureGuide(
+            id: "advisories", title: "Software advisories",
+            summary: "Matches typed local software identities and verified versions against a signed local CVE catalog. Matching stays on this Mac; an incomplete inventory or unknown version is shown as not assessed, never as safe.",
+            steps: ["Open Advisories.", "Rescan bounded software sources, then select an artifact to review its identity, version evidence and any confirmed CVE matches.", "Use Settings to choose project folders for node_modules; use Refresh catalog only when you explicitly want to check the fixed Flowlight advisory origin."],
+            screen: .advisories,
+            caveats: ["The App Store build may not be able to enumerate every source without explicit folder access.", "Advisories do not block traffic or change policies. A stale or unavailable catalog cannot produce a confirmed match."],
+            keywords: ["cve", "vulnerability", "security advisory", "software inventory", "node_modules", "homebrew", "version", "nvd", "unknown", "not assessed"]),
+
+        FeatureGuide(
             id: "updates", title: "Updates",
             summary: "Flowlight checks for new releases and can install them for you. Releases are signed with a Developer ID and notarized by Apple.",
             steps: ["Choose Flowlight › Check for Updates.", "Or install with Homebrew: brew install --cask xinbetween/tap/flowlight."],

@@ -35,11 +35,12 @@ final class VisualizeNavigationTests: XCTestCase {
         XCTAssertEqual(SidebarSection.traffic.items, [.live, .agents, .reports, .visualize, .alerts])
         XCTAssertEqual(SidebarItem.sidebarOrder,
                        [.live, .agents, .reports, .visualize, .alerts,
-                        .ask, .inspect, .rules, .sources])
+                        .ask, .inspect, .rules, .sources, .advisories])
         XCTAssertEqual(SidebarItem.visualize.shortcut, "4")
         XCTAssertEqual(SidebarItem.alerts.shortcut, "5")
         XCTAssertEqual(SidebarItem.rules.shortcut, "8")
         XCTAssertEqual(SidebarItem.sources.shortcut, "9")
+        XCTAssertEqual(SidebarItem.advisories.shortcut, "0")
         XCTAssertTrue(SidebarItem.sidebarOrder.allSatisfy { $0.shortcut != nil })
     }
 

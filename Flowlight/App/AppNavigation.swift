@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum SidebarItem: String, CaseIterable, Identifiable {
-    case live, agents, reports, alerts, rules, ask, inspect, sources, visualize
+    case live, agents, reports, alerts, rules, ask, inspect, sources, visualize, advisories
     var id: String { rawValue }
 
     static var availableCases: [SidebarItem] { allCases }
@@ -22,6 +22,8 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .ask: return "ask"
         case .inspect: return "inspection"
         case .sources: return "sources"
+        // The docs' shared Views section is the current landing point until the advisory guide is translated.
+        case .advisories: return "views"
         }
     }
 
@@ -38,6 +40,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .ask: return "Ask"
         case .inspect: return "Inspect"
         case .sources: return "Sources"
+        case .advisories: return "Advisories"
         }
     }
 
@@ -52,6 +55,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .ask: return L("Ask")
         case .inspect: return L("Inspect")
         case .sources: return L("Sources")
+        case .advisories: return L("Advisories")
         }
     }
     var icon: String {
@@ -65,6 +69,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .ask: return "text.bubble"
         case .inspect: return "lock.open.display"
         case .sources: return "antenna.radiowaves.left.and.right"
+        case .advisories: return "shield.checkered"
         }
     }
     /// The exact visual order of the sidebar. Enum declaration order is an implementation detail and used to
@@ -88,6 +93,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .ask, .inspect: return .investigate
         case .rules: return .control
         case .sources: return .sources
+        case .advisories: return .advisories
         }
     }
 
@@ -100,7 +106,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
             return true
         case .alerts:
             return scope.hosts.isEmpty
-        case .ask, .rules, .sources:
+        case .ask, .rules, .sources, .advisories:
             return false
         }
     }
@@ -112,7 +118,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 /// The grouping is by what someone is trying to do — see what happened, look closer at it, refuse something, or
 /// change where the data comes from — rather than by which part of the app the code lives in.
 enum SidebarSection: String, CaseIterable, Identifiable {
-    case traffic, investigate, control, sources
+    case traffic, investigate, control, sources, advisories
 
     var id: String { rawValue }
 
@@ -122,6 +128,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         case .investigate: return L("Investigate")
         case .control: return L("Control")
         case .sources: return L("Sources")
+        case .advisories: return L("Advisories")
         }
     }
 
@@ -132,6 +139,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
         case .investigate: order = [.ask, .inspect]
         case .control: order = [.rules]
         case .sources: order = [.sources]
+        case .advisories: order = [.advisories]
         }
         return order.filter { SidebarItem.availableCases.contains($0) }
     }
@@ -431,14 +439,15 @@ final class AppNavigation: ObservableObject {
                      appIDs: [String] = [], appName: String? = nil, host: String? = nil,
                      hostIncludesSubdomains: Bool = true,
                      includeAttributedChildren: Bool = false, agentParent: String? = nil,
-                     mcpServer: String? = nil, potentialHarmOnly: Bool = false) {
+                     mcpServer: String? = nil, potentialHarmOnly: Bool = false,
+                     window: AgentWindow = .day) {
         guard SidebarItem.availableCases.contains(.inspect) else { return }
         inspectRequest = InspectRequest(search: "", appID: app?.bundleID,
                                        appIDs: app == nil ? appIDs : [], appName: app?.name ?? appName, host: host,
                                        hostIncludesSubdomains: hostIncludesSubdomains,
                                        includeAttributedChildren: includeAttributedChildren,
                                        agentParent: agentParent, mcpServer: mcpServer,
-                                       potentialHarmOnly: potentialHarmOnly)
+                                       potentialHarmOnly: potentialHarmOnly, window: window)
         followLink(to: .inspect)
     }
 }
@@ -457,7 +466,8 @@ enum InspectNavigationScope {
     }
 
     static func showInspect(_ nav: AppNavigation, filter: TrafficFilter, sourceTitle: String? = nil,
-                            requireDestination: Bool = true, potentialHarmOnly: Bool = false) {
+                            requireDestination: Bool = true, potentialHarmOnly: Bool = false,
+                            window: AgentWindow = .day) {
         guard canInspect(filter, requireDestination: requireDestination) else { return }
         let app = filter.bundleIDs.isEmpty
             ? filter.bundleID.flatMap { $0.isEmpty ? nil : ($0, sourceTitle ?? $0) }
@@ -467,7 +477,7 @@ enum InspectNavigationScope {
                         host: host, hostIncludesSubdomains: false,
                         includeAttributedChildren: filter.includeAttributedChildren,
                         agentParent: filter.agentParent, mcpServer: filter.mcpServer,
-                        potentialHarmOnly: potentialHarmOnly)
+                        potentialHarmOnly: potentialHarmOnly, window: window)
     }
 }
 
@@ -489,5 +499,7 @@ struct InspectRequest: Equatable {
     var policySection: InspectPolicySection? = nil
     /// The exact retained policy to edit. Nil keeps section-level navigation for generic setup links.
     var policyID: UUID? = nil
+    /// A bounded inspection interval carried by an investigation action. Existing links retain the day default.
+    var window: AgentWindow = .day
     var id = UUID()
 }

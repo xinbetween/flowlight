@@ -202,6 +202,12 @@ struct ReportNavigationHistory: Equatable {
     mutating func clear() { states.removeAll() }
 }
 
+struct HistoryCoverage: Equatable {
+    var named: Double = 0
+    var owned: Double = 0
+    var hasTraffic = false
+}
+
 struct ReportsView: View {
     @EnvironmentObject var monitor: TrafficMonitor
     @EnvironmentObject var nav: AppNavigation
@@ -248,6 +254,8 @@ struct ReportsView: View {
     /// Apps whose destinations stand out from the rest of this report. Rebuilt from the same breakdown rows.
     @State private var behaviour: [AppBehaviour] = []
     @State private var localRiskCounts = RiskAssessmentCounts()
+    @State private var reportCoverage = HistoryCoverage()
+    @State private var showRiskDetails = false
 
     enum LowerMode: String, CaseIterable, Identifiable {
         case breakdown, charts, behaviour
@@ -288,7 +296,7 @@ struct ReportsView: View {
         // detail viewport so the table takes the remaining height instead of pushing the report header under the bar.
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .navigationTitle(L("History"))
-        .searchable(text: $query, placement: .toolbar, prompt: L("App, domain, IP, port"))
+        .searchable(text: $query, placement: .toolbar, prompt: L("Filter table rows: app, domain, IP, port"))
         .toolbar {
             ToolbarItem {
                 Menu {
@@ -428,6 +436,7 @@ struct ReportsView: View {
     @ViewBuilder
     private var header: some View {
         controls
+        reportContext
         if !filter.isEmpty { filterChips }
         coverageNotice
         localRiskSummary
@@ -435,50 +444,83 @@ struct ReportsView: View {
         chart
     }
 
+    private var reportIsFiltered: Bool {
+        !filter.isEmpty || !focus.scope.isEmpty
+    }
+
+    private var localRiskScopeSupported: Bool {
+        filter.owner == nil && filter.remoteIP == nil && filter.appProtocol == nil && filter.channel == nil
+    }
+
+    private var reportContext: some View {
+        HStack(spacing: 10) {
+            Label(L("Range: %@", rangeLabel), systemImage: "calendar")
+            if followNow {
+                Text(L("Following now")).foregroundStyle(.secondary)
+            } else {
+                Text(L("Paused")).foregroundStyle(.secondary)
+            }
+            if reportIsFiltered {
+                Text(L("Filtered")).foregroundStyle(.secondary)
+            } else {
+                Text(L("All traffic")).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 4)
+            Label(L("Group: %@", grouping.title), systemImage: "rectangle.3.group")
+                .foregroundStyle(.secondary)
+        }
+        .font(.caption)
+        .lineLimit(1)
+        .help(L("History report context: %@, %@, %@", rangeLabel,
+                reportIsFiltered ? L("filtered traffic") : L("all traffic"), grouping.title))
+        .accessibilityIdentifier("history.report-context")
+    }
+
     private var coverageNotice: some View {
         HStack(spacing: 6) {
             Image(systemName: "info.circle")
-            if monitor.coverage.hasTraffic {
-                Text(L("Hostname coverage, last hour: %@ of bytes",
-                       monitor.coverage.named.formatted(.percent.precision(.fractionLength(0)))))
+            if reportCoverage.hasTraffic {
+                Text(L("Hostname coverage, selected window: %@ of bytes",
+                       reportCoverage.named.formatted(.percent.precision(.fractionLength(0)))))
                 Text("·")
                 Text(L("including network owners: %@",
-                       monitor.coverage.owned.formatted(.percent.precision(.fractionLength(0)))))
+                       reportCoverage.owned.formatted(.percent.precision(.fractionLength(0)))))
             } else {
-                Text(L("Nothing recorded in the last hour"))
+                Text(L("Nothing recorded in this window"))
             }
         }
         .font(.caption)
         .foregroundStyle(.secondary)
-        .help(L("Coverage is for all traffic in the last hour, not the selected report window. IPs without names may belong to shared hosting or CDNs."))
+        .help(L("Coverage is calculated for this report's selected window and filters. IPs without names may belong to shared hosting or CDNs; unknown data is not treated as safe or blocked."))
+        .accessibilityIdentifier("history.coverage")
     }
 
     @ViewBuilder
     private var localRiskSummary: some View {
-        HStack(alignment: .top, spacing: 10) {
+        let hasDetails = localRiskScopeSupported && LocalRiskSettings.isActive &&
+            (localRiskCounts.totalPotentialHarm > 0 || localRiskCounts.unassessed > 0)
+        HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle").foregroundStyle(FL.warning)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(L("Potential harm")).font(.callout.bold())
-                if LocalRiskSettings.isActive {
-                    if localRiskCounts.totalPotentialHarm > 0 {
-                        Text(L("%lld medium or high local assessment%@ in this window.", localRiskCounts.totalPotentialHarm,
-                               localRiskCounts.totalPotentialHarm == 1 ? "" : "s"))
-                            .font(.caption).foregroundStyle(.secondary)
-                    } else {
-                        Text(L("No medium or high local assessments in this window. Requests without an assessment are not being called safe."))
-                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    }
-                    if localRiskCounts.unassessed > 0 {
-                        Text(L("%lld eligible request%@ did not receive a contextual verdict.", localRiskCounts.unassessed,
-                               localRiskCounts.unassessed == 1 ? "" : "s"))
-                            .font(.caption2).foregroundStyle(.secondary)
-                    }
-                } else {
-                    Text(L("Local risk analysis is off. Retained local findings are hidden until you turn it back on."))
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
+            Text(L("Potential harm")).font(.callout.bold())
+            if !localRiskScopeSupported {
+                Text(L("Unavailable for this scope"))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .help(L("Local risk assessments cannot be matched to owner, IP address, protocol, or way-out filters. No finding is being claimed for this scope."))
+            } else if LocalRiskSettings.isActive {
+                Text(localRiskCounts.totalPotentialHarm > 0
+                     ? L("%lld medium/high", localRiskCounts.totalPotentialHarm)
+                     : L("No medium/high findings"))
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text(L("Off · retained findings hidden")).font(.caption).foregroundStyle(.secondary)
             }
-            Spacer()
+            Spacer(minLength: 4)
+            if hasDetails {
+                Button(showRiskDetails ? L("Hide details") : L("Details")) {
+                    showRiskDetails.toggle()
+                }
+                .buttonStyle(.link)
+            }
             Toggle(isOn: Binding(get: { LocalRiskSettings.isActive }, set: { monitor.setLocalRiskEnabled($0) })) {
                 Text(L("Local risk analysis"))
             }
@@ -486,15 +528,33 @@ struct ReportsView: View {
             .disabled(!LocalRiskSettings.canAnalyze)
             if LocalRiskSettings.isActive && localRiskCounts.totalPotentialHarm > 0
                 && InspectNavigationScope.canInspect(filter, requireDestination: false) {
-                Button(L("Show in Inspect")) {
+                Button(L("Show in Inspect · last 24 hours")) {
                     InspectNavigationScope.showInspect(nav, filter: filter, requireDestination: false,
-                                                       potentialHarmOnly: true)
+                                                       potentialHarmOnly: true, window: .day)
                 }
+                .help(L("Open Inspect with this traffic scope over the last 24 hours. The selected History interval is not available in Inspect."))
             }
         }
-        .padding(10)
-        .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
+        .padding(.vertical, 5)
+        .padding(.horizontal, 8)
+        .background(.quaternary.opacity(0.28), in: RoundedRectangle(cornerRadius: 8))
         .help(LocalRiskSettings.readiness.explanation ?? L("On-device-only, advisory scoring after capture. It does not block or change traffic."))
+        .accessibilityIdentifier("history.local-risk")
+        if showRiskDetails && LocalRiskSettings.isActive && hasDetails {
+            VStack(alignment: .leading, spacing: 3) {
+                if localRiskCounts.totalPotentialHarm > 0 {
+                    Text(L("%lld medium or high local assessment%@ in this window.", localRiskCounts.totalPotentialHarm,
+                           localRiskCounts.totalPotentialHarm == 1 ? "" : "s"))
+                }
+                if localRiskCounts.unassessed > 0 {
+                    Text(L("%lld eligible request%@ did not receive a contextual verdict. Requests without an assessment are not being called safe.",
+                           localRiskCounts.unassessed, localRiskCounts.unassessed == 1 ? "" : "s"))
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private var lowerModeBar: some View {
@@ -575,6 +635,7 @@ struct ReportsView: View {
                     .controlSize(.small)
                     .tint(selectedPreset == preset ? FL.accent : nil)
                     .accessibilityValue(selectedPreset == preset ? L("Selected") : "")
+                    .accessibilityIdentifier("history.range.\(preset.rawValue)")
             }
 
             Spacer(minLength: 12)
@@ -986,6 +1047,7 @@ struct ReportsView: View {
             guard let id = ids.first, let node = find(id) else { return }
             if node.moreCount > 0 { showMore(node) } else { applyFilter(node) }
         }
+        .accessibilityIdentifier("history.breakdown")
         .safeAreaInset(edge: .top, spacing: 0) {
             if breakdownTruncated {
                 Label(grouping == .app
@@ -1292,7 +1354,7 @@ struct ReportsView: View {
         let wantsCharts = requestedMode == .charts
         do {
             let wantsBehaviour = requestedMode == .behaviour
-            let result = try await monitor.read { db -> ([SeriesPoint], ReportsBreakdown, InsightsSnapshot?, [BreakdownRow], RiskAssessmentCounts) in
+            let result = try await monitor.read { db -> ([SeriesPoint], ReportsBreakdown, InsightsSnapshot?, [BreakdownRow], RiskAssessmentCounts, HistoryCoverage) in
                 try db.readSnapshot {
                     let series = try db.series(g, from: from, to: to, filter: f)
                     let breakdown = try db.reportsBreakdown(g, from: from, to: to, filter: f)
@@ -1300,7 +1362,10 @@ struct ReportsView: View {
                         ? try db.appDestinationRows(g, from: from, to: to, filter: f)
                         : []
                     let risk = try db.localRiskCounts(since: from, to: to, filter: f)
-                    guard wantsCharts else { return (series, breakdown, nil, behaviourRows, risk) }
+                    let coverage = try db.coverage(g, from: from, to: to, filter: f)
+                    let reportCoverage = HistoryCoverage(named: coverage.named, owned: coverage.owned,
+                                                         hasTraffic: coverage.hasTraffic)
+                    guard wantsCharts else { return (series, breakdown, nil, behaviourRows, risk, reportCoverage) }
                     let snapshot = try InsightsBuilder.load(
                         db: db,
                         dimensions: InsightDimension.available(for: f),
@@ -1311,7 +1376,7 @@ struct ReportsView: View {
                         to: to,
                         filter: f
                     )
-                    return (series, breakdown, snapshot, behaviourRows, risk)
+                    return (series, breakdown, snapshot, behaviourRows, risk, reportCoverage)
                 }
             }
             guard !Task.isCancelled, reloadID == requestID,
@@ -1334,6 +1399,7 @@ struct ReportsView: View {
             // This projection preserves attribution and route evidence that Reports does not need.
             behaviour = DestinationProfile.analyse(result.3)
             localRiskCounts = result.4
+            reportCoverage = result.5
             nodes = TrafficNode.tree(
                 from: result.1.rows,
                 appTotals: grouping == .app ? result.1.appTotals : [],

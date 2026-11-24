@@ -15,6 +15,8 @@ struct InspectMenuItems: View {
     var app: (bundleID: String, name: String)? = nil
     /// The destination the row is about: a hostname or an address.
     var host: String? = nil
+    /// A bounded interval that gives the destination context without accepting arbitrary durations.
+    var window: AgentWindow = .day
 
     var body: some View {
         // These scope the list rather than search it. The first version put the name in the search field, which
@@ -25,13 +27,13 @@ struct InspectMenuItems: View {
                 if let destination = filter.domain.flatMap(HostCanonicalizer.host) {
                     Button(L("Inspect Traffic to %@", destination)) {
                         InspectNavigationScope.showInspect(nav, filter: filter, sourceTitle: app?.name,
-                                                           requireDestination: false)
+                                                           requireDestination: false, window: window)
                     }
                     .help(helpText)
                 } else if let name = app?.name ?? filter.bundleID ?? filter.agentParent {
                     Button(L("Inspect %@'s Traffic", name)) {
                         InspectNavigationScope.showInspect(nav, filter: filter, sourceTitle: app?.name,
-                                                           requireDestination: false)
+                                                           requireDestination: false, window: window)
                     }
                     .help(helpText)
                 }
@@ -40,11 +42,13 @@ struct InspectMenuItems: View {
             // The destination form. Named separately from the app form below because in English the two differ
             // only by word order, which tells a translator nothing about which is which.
             if let host, !host.isEmpty {
-                Button(L("Inspect Traffic to %@", host)) { nav.showInspect(host: host) }
-                    .help(helpText)
+                Button(L("Inspect Traffic to %@", host)) {
+                    nav.showInspect(host: host, hostIncludesSubdomains: false, window: window)
+                }
+                .help(helpText)
             }
             if let app, !app.name.isEmpty {
-                Button(L("Inspect %@'s Traffic", app.name)) { nav.showInspect(app: app) }
+                Button(L("Inspect %@'s Traffic", app.name)) { nav.showInspect(app: app, window: window) }
                     .help(helpText)
             }
         }
@@ -54,9 +58,8 @@ struct InspectMenuItems: View {
     /// decrypted, and arriving at an empty screen without knowing that is how a feature reads as broken.
     private var helpText: String {
         monitor.inspection.enabled
-            // "which is off" attached the clause to the screen, but the screen opens fine — it is HTTPS
-            // inspection that is off. And "this" had no antecedent in a tooltip detached from the row.
-            ? L("Opens Inspect with the selected name in the search field. Only traffic that went through the proxy can be shown.")
-            : L("Opens Inspect. HTTPS inspection is off — nothing has been decrypted yet, so there will be nothing to show.")
+            // The app identity is structured, not a body-search term. The bounded window makes the handoff clear.
+            ? L("Opens Inspect with an exact structured scope over %@. Only traffic that went through the proxy can be shown.", window.title)
+            : L("Opens Inspect with an exact structured scope over %@. HTTPS inspection is off — nothing has been decrypted yet, so there will be nothing to show.", window.title)
     }
 }

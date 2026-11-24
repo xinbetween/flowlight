@@ -7,6 +7,16 @@ import Foundation
 /// one. Typing "Cursor" has to become `com.todesktop.230313mzl4w4u92` somewhere, and the only place that mapping
 /// exists is the app bundles themselves.
 enum InstalledApps {
+    /// Evidence that the identity came from an application bundle discovered by the filesystem scan.
+    enum ScanEvidence: String, Equatable, Hashable, Sendable {
+        case applicationBundle
+    }
+
+    /// Evidence that version values came from the bundle's Info.plist, rather than a guessed filename or path.
+    enum VersionEvidence: String, Equatable, Hashable, Sendable {
+        case bundleInfoDictionary
+    }
+
     struct App: Equatable, Identifiable, Sendable {
         var name: String
         var bundleID: String
@@ -15,6 +25,14 @@ enum InstalledApps {
         /// What the app told macOS it wants Bluetooth for, when it declares a use. This is the app saying it is
         /// built to use the radio — not macOS saying it was granted access, which no ordinary app can read.
         var bluetoothPurpose: String?
+        /// The user-facing version from CFBundleShortVersionString, when the bundle provides one.
+        var marketingVersion: String?
+        /// The build identifier from CFBundleVersion, when the bundle provides one.
+        var buildVersion: String?
+        /// Identity evidence is explicit so downstream analysis never has to infer it from a path or filename.
+        var scanEvidence: ScanEvidence = .applicationBundle
+        /// Version evidence is nil when neither Info.plist version key contained a usable string.
+        var versionEvidence: VersionEvidence? = nil
     }
 
     struct ScanResult: Sendable {
@@ -37,7 +55,22 @@ enum InstalledApps {
     static func all() -> [App] { scan().apps }
 
     static func scan(refresh: Bool = false) -> ScanResult {
-        cachedScan(refresh: refresh) { scan(in: searchPaths) }
+        cachedScan(refresh: refresh) {
+            let result = scan(in: searchPaths)
+            #if APP_STORE
+            // Sandboxed Store builds cannot truthfully claim that standard roots are a complete inventory. A
+            // user-selected security-scoped location can be added later without changing the advisory matcher.
+            return ScanResult(apps: result.apps, complete: false)
+            #else
+            return result
+            #endif
+        }
+    }
+
+    private static func infoString(_ bundle: Bundle, key: String) -> String? {
+        guard let value = bundle.object(forInfoDictionaryKey: key) as? String else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     static func cachedScan(refresh: Bool = false, _ load: () -> ScanResult) -> ScanResult {
@@ -66,20 +99,53 @@ enum InstalledApps {
     }
 
     static func scan(in searchPaths: [String], manager: FileManager = .default) -> ScanResult {
+        let result = scanAll(in: searchPaths, manager: manager)
+        var unique: [String: App] = [:]
+        for app in result.apps {
+            if let existing = unique[app.bundleID], existing.path <= app.path { continue }
+            unique[app.bundleID] = app
+        }
+        return ScanResult(apps: unique.values.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }, complete: result.complete)
+    }
+
+    /// Returns every distinct canonical bundle path for advisory inventory. The compatibility `scan` method above
+    /// retains one deterministic record per bundle ID for focus and Bluetooth callers.
+    static func scanAll(in searchPaths: [String], manager: FileManager = .default,
+                        maximumDepth: Int = 8, maximumVisits: Int = 50_000) -> ScanResult {
         var found: [String: App] = [:]
         var complete = true
         for directory in searchPaths {
             guard manager.fileExists(atPath: directory) else { continue }
+            let rootURL = URL(fileURLWithPath: directory).standardizedFileURL
             guard let enumerator = manager.enumerator(
-                at: URL(fileURLWithPath: directory),
-                includingPropertiesForKeys: [.isDirectoryKey, .isPackageKey],
+                at: rootURL,
+                includingPropertiesForKeys: [.isDirectoryKey, .isPackageKey, .isSymbolicLinkKey],
                 options: [.skipsHiddenFiles],
                 errorHandler: { _, _ in complete = false; return true }
             ) else {
                 complete = false
                 continue
             }
+            var visits = 0
             for case let url as URL in enumerator {
+                visits += 1
+                if visits > maximumVisits {
+                    complete = false
+                    break
+                }
+                guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+                      values.isSymbolicLink != true else {
+                    enumerator.skipDescendants()
+                    continue
+                }
+                if values.isDirectory == true,
+                   url.pathComponents.count - rootURL.pathComponents.count >= maximumDepth {
+                    complete = false
+                    enumerator.skipDescendants()
+                    continue
+                }
                 guard url.pathExtension.caseInsensitiveCompare("app") == .orderedSame else { continue }
                 enumerator.skipDescendants()
                 guard let bundle = Bundle(url: url), let id = bundle.bundleIdentifier, !id.isEmpty else {
@@ -90,14 +156,24 @@ enum InstalledApps {
                     ?? url.deletingPathExtension().lastPathComponent
                 let purpose = (bundle.object(forInfoDictionaryKey: "NSBluetoothAlwaysUsageDescription") as? String)
                     ?? (bundle.object(forInfoDictionaryKey: "NSBluetoothPeripheralUsageDescription") as? String)
-                found[id] = App(name: name, bundleID: id, path: url.path, bluetoothPurpose: purpose)
+                let marketingVersion = infoString(bundle, key: "CFBundleShortVersionString")
+                let buildVersion = infoString(bundle, key: "CFBundleVersion")
+                let versionEvidence: VersionEvidence? = marketingVersion != nil || buildVersion != nil
+                    ? .bundleInfoDictionary : nil
+                let canonicalPath = url.resolvingSymlinksInPath().standardizedFileURL.path
+                let key = "\(id.lowercased()):\(canonicalPath)"
+                found[key] = App(name: name, bundleID: id, path: canonicalPath, bluetoothPurpose: purpose,
+                                 marketingVersion: marketingVersion, buildVersion: buildVersion,
+                                 scanEvidence: .applicationBundle, versionEvidence: versionEvidence)
             }
         }
-        let result = ScanResult(
-            apps: found.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending },
+        return ScanResult(
+            apps: found.values.sorted {
+                let name = $0.name.localizedCaseInsensitiveCompare($1.name)
+                return name == .orderedAscending || (name == .orderedSame && $0.path < $1.path)
+            },
             complete: complete && !found.isEmpty
         )
-        return result
     }
 
     /// The applications built to use Bluetooth, as they say so themselves in their Info.plist.
