@@ -511,7 +511,7 @@ struct AdvisoryInventoryScanner {
         // Open without following symlinks, then validate the descriptor itself. Checking the URL before
         // opening is not sufficient: a selected project or Homebrew prefix can replace a regular file
         // with a FIFO between the check and the read, which would otherwise block the scan indefinitely.
-        let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+        let descriptor = Darwin.open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
         guard descriptor >= 0 else { return .unavailable }
         var fileStatus = stat()
         guard Darwin.fstat(descriptor, &fileStatus) == 0,
