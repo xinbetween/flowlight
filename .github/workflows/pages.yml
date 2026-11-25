@@ -104,12 +104,11 @@ jobs:
       # and the deployment job keeps only the two permissions required by Pages itself.
       - name: Reject a source that became stale before deployment
         env:
+          GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
         run: |
           set -euo pipefail
-          CURRENT_MAIN=$(curl --fail --silent --show-error \
-            --connect-timeout 10 --max-time 30 \
-            https://api.github.com/repos/xinbetween/flowlight/git/ref/heads/main | jq -r .object.sha)
+          CURRENT_MAIN=$(gh api repos/xinbetween/flowlight/git/ref/heads/main --jq .object.sha)
           [[ "$SOURCE_SHA" == "$CURRENT_MAIN" ]] || {
             echo "::error::Verified source $SOURCE_SHA is stale; main is now $CURRENT_MAIN."
             exit 1
