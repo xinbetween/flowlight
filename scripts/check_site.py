@@ -230,10 +230,11 @@ def pages_workflow_problems(source):
         found.append("Pages does not bind its source to successful canonical main CI")
     if "consume-pages" not in source or "actions/upload-pages-artifact@" not in source:
         found.append("Pages does not consume and upload the verified CI artifact")
-    if source.count('CURRENT_MAIN=$(gh api "repos/$REPOSITORY/git/ref/heads/main"') != 1 \
-            or source.count('CURRENT_MAIN=$(curl --fail --silent --show-error') != 1:
-        found.append("Pages does not reject stale main before verification and deployment")
+    prepare_freshness_check = 'CURRENT_MAIN=$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq .object.sha)'
+    deploy_freshness_check = 'CURRENT_MAIN=$(gh api repos/xinbetween/flowlight/git/ref/heads/main --jq .object.sha)'
     deploy = source.split("\n  deploy:\n", 1)[1] if "\n  deploy:\n" in source else ""
+    if source.count(prepare_freshness_check) != 1 or deploy.count(deploy_freshness_check) != 1:
+        found.append("Pages does not reject stale main before verification and deployment")
     permission_block = re.search(r"(?ms)^    permissions:\n((?:      [^\n]+\n)+)", deploy)
     permissions = permission_block.group(1) if permission_block else ""
     if permissions.strip().splitlines() != ["pages: write", "      id-token: write"]:
