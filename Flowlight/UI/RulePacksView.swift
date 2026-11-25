@@ -110,6 +110,11 @@ private struct RulePacksContent: View {
                 if !diagnostics.detail.isEmpty {
                     Text(diagnostics.detail).foregroundStyle(FL.warning)
                 }
+                if packs.hasEnabledPacks && !diagnostics.isEnforcingDesiredDigest {
+                    Button(L("Retry synchronization")) { monitor.retryRulePackSynchronization() }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("managed-packs.retry-synchronization")
+                }
             }
             .font(.caption.monospaced())
             .textSelection(.enabled)

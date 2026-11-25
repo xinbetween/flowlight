@@ -1690,6 +1690,12 @@ November 25, 2026Latest
 
  Be clear about the initial catalog. This release contains an intentionally empty signed catalog. It enables a verified catalog state but does not claim that software is safe or report CVEs until a separately reviewed and offline-signed advisory catalog with real records is published.
 
+ Recover HTTPS inspection safely. Inspection remembers enabled intent across relaunches and upgrades, while remaining stopped until the extension confirms the exact rule-pack generation and digest. A visible retry action recovers temporary synchronization failures without weakening the fail-closed barrier.
+
+ Make version evidence useful. Explicit, bounded profiles cover common tools such as Wget, Swift, kubectl, Python, and Pip, with a specific reason when a version cannot be identified.
+
+ Group package inventory clearly. Homebrew, npm, and bounded metadata-only coverage for ten language package ecosystems appear under one Packages filter while ecosystem-qualified identities remain separate for advisory matching.
+
  0.18.10
 November 24, 2026
 

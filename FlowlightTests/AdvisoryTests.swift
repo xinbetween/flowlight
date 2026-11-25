@@ -88,6 +88,30 @@ final class AdvisoryTests: XCTestCase {
         XCTAssertFalse(advisory.matches(wrongIdentity), "same text in another identity is not a match")
     }
 
+    func testGenericPackageMatchingRequiresTheSamePackageManager() {
+        let match = AdvisoryCPEMatch(
+            criteria: "cpe:2.3:a:example:shared:*:*:*:*:*:*:*:*",
+            targets: [AdvisoryTarget(kind: .package, identifier: "shared", packageManager: .npm)],
+            versionStartIncluding: "1.0.0",
+            versionEndExcluding: "2.0.0"
+        )
+        let advisory = SecurityAdvisory(
+            id: "CVE-2099-0004",
+            configurations: [AdvisoryConfiguration(nodes: [AdvisoryNode(matches: [match])])]
+        )
+        let npm = AdvisoryArtifact(kind: .package, identifier: "shared", name: "shared", path: "/tmp/npm/shared",
+                                   version: "1.5.0", versionScheme: .semver, identityEvidence: .packageManifest,
+                                   versionEvidence: .packageMetadata, source: "npm", iconPath: nil,
+                                   packageManager: .npm)
+        let cargo = AdvisoryArtifact(kind: .package, identifier: "shared", name: "shared", path: "/tmp/cargo/shared",
+                                     version: "1.5.0", versionScheme: .semver, identityEvidence: .packageManifest,
+                                     versionEvidence: .packageMetadata, source: "Cargo", iconPath: nil,
+                                     packageManager: .cargo)
+
+        XCTAssertTrue(advisory.matches(npm))
+        XCTAssertFalse(advisory.matches(cargo))
+    }
+
     func testBundledAdvisoryCatalogBootstrapsWithProductionTrust() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let url = root.appendingPathComponent("Flowlight/Resources/Advisories/advisories.json")

@@ -11,6 +11,15 @@
 "Identified %lld of %lld executable versions; some remain unknown." = "已識別 %lld/%lld 個可執行檔版本；部分版本仍未知。";
 "Identified %lld of %lld executable versions." = "已識別 %lld/%lld 個可執行檔版本。";
 "Executable version output" = "可執行檔版本輸出";
+"Packages" = "套件";
+"Version identified" = "已識別版本";
+"Version check not attempted" = "尚未嘗試版本檢查";
+"Executable unavailable" = "無法使用可執行檔";
+"Version command failed" = "版本指令失敗";
+"Version check timed out" = "版本檢查逾時";
+"Version output exceeded the limit" = "版本輸出超過限制";
+"Version check cancelled" = "版本檢查已取消";
+"Version output not recognized" = "無法識別版本輸出";
 "Traffic spike" = "流量突增";
 "Unusual number of destinations" = "目標數量異常";
 "First contact with domain" = "首次連線網域";

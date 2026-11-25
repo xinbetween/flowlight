@@ -104,6 +104,41 @@ final class AdvisoryInventoryTests: XCTestCase {
         XCTAssertFalse(result.complete)
     }
 
+    func testSelectedProjectScanExtractsBoundedMetadataForSupportedPackageManagers() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-package-adapters-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let files: [String: String] = [
+            "requirements.txt": "requests==2.32.3\n",
+            "Cargo.lock": "[[package]]\nname = \"serde\"\nversion = \"1.0.210\"\n",
+            "go.mod": "module example.com/tool\n\nrequire github.com/example/dep v1.2.3\n",
+            "Gemfile.lock": "GEM\n  specs:\n    rack (3.1.8)\n",
+            "composer.lock": "{\"packages\":[{\"name\":\"vendor/pkg\",\"version\":\"1.2.3\"}]}",
+            "pom.xml": "<project><groupId>com.example</groupId><artifactId>demo</artifactId><version>1.2.3</version></project>",
+            "gradle.lockfile": "com.example:demo:1.2.3=runtimeClasspath\n",
+            "packages.lock.json": "{\"version\":1,\"dependencies\":{\"Example.Package\":{\"type\":\"Transitive\",\"version\":\"1.2.3\"}}}",
+            "Package.resolved": "{\"pins\":[{\"identity\":\"swift-log\",\"state\":{\"version\":\"1.5.4\"}}]}",
+            "mix.lock": "%{\"plug\": {:hex, :plug, \"1.16.1\", \"sha256\", \"checksum\", []}}"
+        ]
+        for (name, contents) in files {
+            try Data(contents.utf8).write(to: root.appendingPathComponent(name))
+        }
+
+        let config = AdvisoryInventoryScanner.Configuration(
+            applicationRoots: [], executableRoots: [], homebrewPrefixes: [],
+            selectedProjectRoots: [AdvisoryInventoryRoot(path: root.path, userSelected: true)]
+        )
+        let result = AdvisoryInventoryScanner(configuration: config).scan()
+        let packages = result.artifacts.filter { $0.kind == .package }
+
+        XCTAssertEqual(Set(packages.compactMap(\.packageManager)), Set([
+            .pip, .cargo, .goModules, .bundler, .composer, .maven, .gradle, .nuget, .swiftPM, .mix
+        ]))
+        XCTAssertTrue(packages.contains { $0.identifier == "requests" && $0.version == "2.32.3" })
+        XCTAssertTrue(packages.contains { $0.identifier == "github.com/example/dep" && $0.version == "1.2.3" })
+        XCTAssertTrue(result.sources.first?.complete == true)
+    }
+
     func testSameNameAcrossKindsHasDistinctStableIDs() throws {
         let artifacts = [
             AdvisoryArtifact(kind: .executable, identifier: "curl", name: "curl", path: "/usr/bin/curl", version: nil, versionScheme: .opaque, identityEvidence: .executablePath, versionEvidence: nil, source: "Executable path", iconPath: nil),
@@ -119,6 +154,29 @@ final class AdvisoryInventoryTests: XCTestCase {
         XCTAssertEqual(ExecutableVersionProbe.parseVersion(from: "v2.43.0"), "2.43.0")
         XCTAssertNil(ExecutableVersionProbe.parseVersion(from: "tool version unknown"))
         XCTAssertNil(ExecutableVersionProbe.parseVersion(from: "tool 1.2.3 and library 4.5.6"))
+    }
+
+    func testKnownExecutableProfilesParseToolSpecificBanners() {
+        XCTAssertEqual(
+            ExecutableVersionProbe.parseVersion(from: Data("GNU Wget 1.21.4 built on darwin\n".utf8), expectedExecutable: "wget"),
+            "1.21.4"
+        )
+        XCTAssertEqual(
+            ExecutableVersionProbe.parseVersion(from: Data("Apple Swift version 6.0.2 (swift-6.0.2-RELEASE)\n".utf8), expectedExecutable: "swift"),
+            "6.0.2"
+        )
+        XCTAssertEqual(
+            ExecutableVersionProbe.parseVersion(from: Data("{\"clientVersion\":{\"gitVersion\":\"v1.30.2\"}}\n".utf8), expectedExecutable: "kubectl"),
+            "1.30.2"
+        )
+        XCTAssertEqual(
+            ExecutableVersionProbe.parseVersion(from: Data("Python 3.13.0\n".utf8), expectedExecutable: "python3.13"),
+            "3.13.0"
+        )
+        XCTAssertEqual(
+            ExecutableVersionProbe.parseVersion(from: Data("pip 24.2 from /tmp/site-packages (python 3.13)\n".utf8), expectedExecutable: "pip3.13"),
+            "24.2"
+        )
     }
 
     func testExecutableVersionProbeIsExplicitAndAddsEvidence() async throws {

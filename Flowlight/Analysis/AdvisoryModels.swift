@@ -67,10 +67,13 @@ struct AdvisoryNode: Codable, Equatable, Hashable, Sendable {
 struct AdvisoryTarget: Codable, Equatable, Hashable, Sendable {
     var kind: AdvisoryArtifactKind
     var identifier: String
+    /// Required for generic package targets; nil preserves the legacy kind-qualified wire format.
+    var packageManager: AdvisoryPackageManager?
 
-    init(kind: AdvisoryArtifactKind, identifier: String) {
+    init(kind: AdvisoryArtifactKind, identifier: String, packageManager: AdvisoryPackageManager? = nil) {
         self.kind = kind
         self.identifier = identifier
+        self.packageManager = packageManager
     }
 }
 
@@ -139,7 +142,12 @@ struct AdvisoryCPEMatch: Codable, Equatable, Hashable, Sendable {
             return true
         }
         return targets.contains {
-            $0.kind == artifact.kind && $0.identifier.caseInsensitiveCompare(artifact.identifier) == .orderedSame
+            guard $0.kind == artifact.kind,
+                  $0.identifier.caseInsensitiveCompare(artifact.identifier) == .orderedSame else { return false }
+            if $0.kind == .package {
+                return $0.packageManager == artifact.packageManager
+            }
+            return true
         }
     }
 

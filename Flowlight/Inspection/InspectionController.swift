@@ -770,9 +770,20 @@ final class InspectionController: ObservableObject {
     /// Everything the simple switch does: create the certificate, trust it, start the proxy and route apps through it.
     /// Trusting and changing the proxy both need an administrator, so they go in one prompt rather than two.
     func setEnabled(_ on: Bool) {
-        // Never let a fast UI action outrun the persisted-policy startup barrier. Turning inspection off remains
-        // available while policy state is loading; turning it on becomes available as soon as every publication is ready.
-        guard !on || policyStateReady else { return }
+        // Persist the user's intent even while policy publications are converging. The proxy remains stopped until
+        // the exact rule-pack snapshot is ready, then setPolicyStateReady(true) calls apply().
+        if on {
+            UserDefaults.standard.set(true, forKey: Keys.enabled)
+            guard policyStateReady else {
+                lastError = L("HTTPS inspection is waiting for the filter to acknowledge the exact policy snapshot.")
+                objectWillChange.send()
+                refreshStatus()
+                return
+            }
+        } else {
+            UserDefaults.standard.set(false, forKey: Keys.enabled)
+            UserDefaults.standard.removeObject(forKey: Keys.sessionStarted)
+        }
         #if APP_STORE
         lastError = nil
         if !on { attributionReady = false }

@@ -153,14 +153,20 @@ enum AdvisoryCatalogVerifier {
                             try bytes.append(UInt8(1))
                             try bytes.append(UInt32(match.targets.count))
                             for target in match.targets {
-                                guard !target.identifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                                guard !target.identifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                                      target.kind != .package || target.packageManager != nil else {
                                     throw AdvisoryCatalogVerificationError.invalidCPEMatch
                                 }
-                                let key = "\(target.kind.rawValue):\(target.identifier.lowercased())"
+                                let managerKey = target.packageManager?.rawValue ?? ""
+                                let key = "\(target.kind.rawValue):\(managerKey):\(target.identifier.lowercased())"
                                 if let previous, previous >= key { throw AdvisoryCatalogVerificationError.invalidCPEMatch }
                                 previous = key
                                 try bytes.append(target.kind.rawValue)
                                 try bytes.append(target.identifier)
+                                if let packageManager = target.packageManager {
+                                    try bytes.append(UInt8(1))
+                                    try bytes.append(packageManager.rawValue)
+                                }
                             }
                         }
                     }

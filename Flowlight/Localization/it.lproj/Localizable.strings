@@ -11,6 +11,15 @@
 "Identified %lld of %lld executable versions; some remain unknown." = "Identificate %lld versioni di eseguibili su %lld; alcune restano sconosciute.";
 "Identified %lld of %lld executable versions." = "Identificate %lld versioni di eseguibili su %lld.";
 "Executable version output" = "Output della versione dell’eseguibile";
+"Packages" = "Pacchetti";
+"Version identified" = "Versione identificata";
+"Version check not attempted" = "Controllo versione non eseguito";
+"Executable unavailable" = "Eseguibile non disponibile";
+"Version command failed" = "Comando della versione non riuscito";
+"Version check timed out" = "Controllo versione scaduto";
+"Version output exceeded the limit" = "L'output della versione supera il limite";
+"Version check cancelled" = "Controllo versione annullato";
+"Version output not recognized" = "Output della versione non riconosciuto";
 "Traffic spike" = "Picco di traffico";
 "Unusual number of destinations" = "Numero insolito di destinazioni";
 "First contact with domain" = "Primo contatto con un dominio";

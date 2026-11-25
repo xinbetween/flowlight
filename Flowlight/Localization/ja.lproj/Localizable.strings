@@ -11,6 +11,15 @@
 "Identified %lld of %lld executable versions; some remain unknown." = "%lld/%lld個の実行ファイルのバージョンを特定しました。一部は不明のままです。";
 "Identified %lld of %lld executable versions." = "%lld/%lld個の実行ファイルのバージョンを特定しました。";
 "Executable version output" = "実行ファイルのバージョン出力";
+"Packages" = "パッケージ";
+"Version identified" = "バージョンを特定しました";
+"Version check not attempted" = "バージョン確認は未実行";
+"Executable unavailable" = "実行ファイルを利用できません";
+"Version command failed" = "バージョンコマンドに失敗";
+"Version check timed out" = "バージョン確認がタイムアウト";
+"Version output exceeded the limit" = "バージョン出力が上限を超過";
+"Version check cancelled" = "バージョン確認をキャンセル";
+"Version output not recognized" = "バージョン出力を認識できません";
 "Traffic spike" = "トラフィックの急増";
 "Unusual number of destinations" = "接続先の数が異常";
 "First contact with domain" = "ドメインへの初回接続";

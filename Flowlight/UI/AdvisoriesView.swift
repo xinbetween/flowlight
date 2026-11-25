@@ -13,6 +13,7 @@ struct AdvisoriesView: View {
     @State private var probeProgress = 0
     @State private var probeTotal = 0
     @State private var probeSummary: String?
+    @State private var probeStatuses: [String: ExecutableVersionProbe.Status] = [:]
     @State private var refreshID = 0
     @State private var probeRunID: UUID?
     @State private var selectedArtifactID: String?
@@ -33,26 +34,22 @@ struct AdvisoriesView: View {
     }
 
     enum KindFilter: String, CaseIterable, Identifiable {
-        case all, application, executable, homebrewFormula, homebrewCask, nodePackage
+        case all, application, executable, packages
         var id: String { rawValue }
         var title: String {
             switch self {
             case .all: return L("All software")
             case .application: return AdvisoryArtifactKind.application.title
             case .executable: return AdvisoryArtifactKind.executable.title
-            case .homebrewFormula: return AdvisoryArtifactKind.homebrewFormula.title
-            case .homebrewCask: return AdvisoryArtifactKind.homebrewCask.title
-            case .nodePackage: return AdvisoryArtifactKind.nodePackage.title
+            case .packages: return L("Packages")
             }
         }
-        var kind: AdvisoryArtifactKind? {
+        func matches(_ artifact: AdvisoryArtifact) -> Bool {
             switch self {
-            case .all: return nil
-            case .application: return .application
-            case .executable: return .executable
-            case .homebrewFormula: return .homebrewFormula
-            case .homebrewCask: return .homebrewCask
-            case .nodePackage: return .nodePackage
+            case .all: return true
+            case .application: return artifact.kind == .application
+            case .executable: return artifact.kind == .executable
+            case .packages: return artifact.kind.isPackage
             }
         }
     }
@@ -60,18 +57,21 @@ struct AdvisoriesView: View {
     fileprivate struct Row: Identifiable {
         var artifact: AdvisoryArtifact
         var matches: [SecurityAdvisory]
+        var probeStatus: ExecutableVersionProbe.Status?
         var id: String { artifact.id }
         var isUnknown: Bool { !artifact.hasVersionEvidence }
         var isAffected: Bool { !matches.isEmpty }
     }
 
     private var allRows: [Row] {
-        artifacts.map { artifact in Row(artifact: artifact, matches: store.matches(artifact)) }
+        artifacts.map { artifact in
+            Row(artifact: artifact, matches: store.matches(artifact), probeStatus: probeStatuses[artifact.id])
+        }
     }
 
     private var filteredRows: [Row] {
         allRows.filter { row in
-            let kindMatches = kindFilter.kind.map { row.artifact.kind == $0 } ?? true
+            let kindMatches = kindFilter.matches(row.artifact)
             let statusMatches: Bool
             switch statusFilter {
             case .all: statusMatches = true
@@ -332,7 +332,7 @@ struct AdvisoriesView: View {
                     }
                     VStack(alignment: .leading, spacing: 1) {
                         Text(row.artifact.name).lineLimit(1)
-                        Text(row.artifact.kind.title)
+                        Text(row.artifact.packageManager?.title ?? row.artifact.kind.title)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -376,11 +376,29 @@ struct AdvisoriesView: View {
     }
 
     private func versionText(for row: Row) -> String {
-        guard let version = row.artifact.version else { return L("Version unknown") }
+        guard let version = row.artifact.version else {
+            if let probeStatus = row.probeStatus {
+                return probeStatusTitle(probeStatus)
+            }
+            return L("Version unknown")
+        }
         if let build = row.artifact.buildVersion, build != version {
             return L("Version %@ · build %@ · %@", version, build, versionEvidenceTitle(for: row.artifact))
         }
         return L("Version %@ · %@", version, versionEvidenceTitle(for: row.artifact))
+    }
+
+    private func probeStatusTitle(_ status: ExecutableVersionProbe.Status) -> String {
+        switch status {
+        case .found: return L("Version identified")
+        case .notAttempted: return L("Version check not attempted")
+        case .unavailable: return L("Executable unavailable")
+        case .nonZeroExit: return L("Version command failed")
+        case .timedOut: return L("Version check timed out")
+        case .outputLimitExceeded: return L("Version output exceeded the limit")
+        case .cancelled: return L("Version check cancelled")
+        case .invalidOutput: return L("Version output not recognized")
+        }
     }
 
     private func versionEvidenceTitle(for artifact: AdvisoryArtifact) -> String {
@@ -388,6 +406,7 @@ struct AdvisoriesView: View {
         case .bundleInfoDictionary: return L("Info.plist")
         case .homebrewInstallReceipt: return L("Homebrew receipt")
         case .packageJSON: return L("package.json")
+        case .packageMetadata: return L("Package metadata")
         case .executableVersionProbe: return L("Executable version output")
         case nil: return L("path only")
         }
@@ -396,7 +415,10 @@ struct AdvisoriesView: View {
     private func statusTitle(for row: Row) -> String {
         if !store.catalogReady { return L("Not assessed") }
         if row.isAffected { return L("Affected") }
-        if row.isUnknown { return L("Unknown version") }
+        if row.isUnknown {
+            if let probeStatus = row.probeStatus { return probeStatusTitle(probeStatus) }
+            return L("Unknown version")
+        }
         return L("No matching advisory")
     }
 
@@ -420,6 +442,7 @@ struct AdvisoriesView: View {
         artifacts = result.artifacts
         sources = result.sources
         scanComplete = result.complete
+        probeStatuses = [:]
         probeSummary = nil
     }
 
@@ -444,6 +467,7 @@ struct AdvisoriesView: View {
         for candidate in candidates.prefix(probe.maximumProbes) {
             guard !Task.isCancelled else { break }
             let result = await probe.probe(candidate)
+            probeStatuses[candidate.id] = result.status
             attempted += 1
             if result.status == .found, let version = result.version,
                let index = artifacts.firstIndex(where: { $0.id == candidate.id }) {
@@ -531,6 +555,7 @@ private struct AdvisoryDetailView: View {
         case .bundleInfoDictionary: return L("Info.plist")
         case .homebrewInstallReceipt: return L("Homebrew install receipt")
         case .packageJSON: return L("package.json")
+        case .packageMetadata: return L("Package metadata")
         case .executableVersionProbe: return L("Executable version output")
         case nil: return L("identity/path only")
         }

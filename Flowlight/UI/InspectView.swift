@@ -114,7 +114,9 @@ private struct InspectContent: View {
             if (!inspection.enabled || showSetup) && !DemoData.isEnabled {
                 ScrollView {
                     InspectionSetup(inspection: inspection, openMocks: openMocks, openRewrites: openRewrites,
-                                    openResponseTransforms: openResponseTransforms, done: { showSetup = false })
+                                    openResponseTransforms: openResponseTransforms,
+                                    retryPolicy: monitor.retryRulePackSynchronization,
+                                    done: { showSetup = false })
                         .padding(.bottom, 20)
                 }
             } else {
@@ -597,6 +599,7 @@ private struct InspectionSetup: View {
     var openMocks = false
     var openRewrites = false
     var openResponseTransforms = false
+    var retryPolicy: () -> Void
     var done: () -> Void
     @State private var newPattern = ""
     @State private var confirmRemove = false
@@ -635,7 +638,7 @@ private struct InspectionSetup: View {
                         }
                     }
                     .toggleStyle(.switch)
-                    .disabled(inspection.working || (!inspection.enabled && !inspection.policyStateReady))
+                    .disabled(inspection.working)
 
                     if inspection.working {
                         HStack(spacing: 6) {
@@ -681,7 +684,22 @@ private struct InspectionSetup: View {
                 .padding(6)
             }
 
-            if let error = inspection.lastError {
+            if !inspection.policyStateReady {
+                HStack(alignment: .top, spacing: 8) {
+                    Label(inspection.lastError ?? L("HTTPS inspection is waiting for policy synchronization."),
+                          systemImage: "arrow.triangle.2.circlepath")
+                        .foregroundStyle(FL.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Button(L("Retry synchronization")) { retryPolicy() }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("inspect.retry-policy")
+                }
+                .font(.caption)
+                .padding(10)
+                .background(FL.warning.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                .accessibilityIdentifier("inspect.policy-pending")
+            } else if let error = inspection.lastError {
                 Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(FL.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
