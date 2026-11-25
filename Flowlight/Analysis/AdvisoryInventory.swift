@@ -530,6 +530,10 @@ struct AdvisoryInventoryScanner {
                 continue
             }
             if url.lastPathComponent == "package.json", url.pathComponents.contains("node_modules") {
+                guard artifacts.count < max(0, configuration.maximumPackageArtifacts) else {
+                    complete = false
+                    break
+                }
                 guard let package = readPackage(url) else {
                     complete = false
                     continue
@@ -549,6 +553,10 @@ struct AdvisoryInventoryScanner {
                     iconPath: nil,
                     packageManager: .npm
                 ))
+                if artifacts.count >= max(0, configuration.maximumPackageArtifacts) {
+                    complete = false
+                    break
+                }
                 continue
             }
             guard let manager = packageManager(for: url.lastPathComponent) else { continue }

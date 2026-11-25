@@ -104,6 +104,28 @@ final class AdvisoryInventoryTests: XCTestCase {
         XCTAssertFalse(result.complete)
     }
 
+    func testNodePackageArtifactsRespectTheAggregateCapAndReportIncompleteSource() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-node-cap-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        for index in 0..<4 {
+            let manifest = root.appendingPathComponent("node_modules/package-\(index)/package.json")
+            try FileManager.default.createDirectory(at: manifest.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("{\"name\":\"package-\(index)\",\"version\":\"1.0.\(index)\"}".utf8).write(to: manifest)
+        }
+
+        let config = AdvisoryInventoryScanner.Configuration(
+            applicationRoots: [], executableRoots: [], homebrewPrefixes: [],
+            selectedProjectRoots: [AdvisoryInventoryRoot(path: root.path, userSelected: true)],
+            maximumPackageArtifacts: 2
+        )
+        let result = AdvisoryInventoryScanner(configuration: config).scan()
+        let source = try XCTUnwrap(result.sources.first(where: { $0.source == root.path }))
+
+        XCTAssertEqual(result.artifacts.filter { $0.kind == .nodePackage }.count, 2)
+        XCTAssertFalse(source.complete)
+        XCTAssertFalse(result.complete)
+    }
+
     func testSelectedProjectScanExtractsBoundedMetadataForSupportedPackageManagers() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-package-adapters-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }

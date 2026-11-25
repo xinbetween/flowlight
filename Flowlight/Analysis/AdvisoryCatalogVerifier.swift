@@ -299,7 +299,7 @@ enum AdvisoryCatalogVerifier {
                             let m = try dictionary(match, keys: ["criteria", "matchCriteriaId", "vulnerable", "bundleIDs", "targets", "versionStartIncluding", "versionStartExcluding", "versionEndIncluding", "versionEndExcluding"], optional: ["matchCriteriaId", "bundleIDs", "targets", "versionStartIncluding", "versionStartExcluding", "versionEndIncluding", "versionEndExcluding"])
                             if let targets = m["targets"] {
                                 for target in try array(targets) {
-                                    _ = try dictionary(target, keys: ["kind", "identifier"])
+                                    _ = try dictionary(target, keys: ["kind", "identifier", "packageManager"], optional: ["packageManager"])
                                 }
                             }
                         }
