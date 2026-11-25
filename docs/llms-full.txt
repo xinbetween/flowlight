@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.18.10, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.18.11, macOS 15 or later.
 
  On this page
 
@@ -937,7 +937,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.18.10macOS 15+UniversalGPL-3.0No telemetry
+ v0.18.11macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1681,8 +1681,17 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.18.11
+November 25, 2026Latest
+
+ Make advisory catalog availability verifiable. Flowlight now ships the signed advisory catalog at the endpoint used by the app, so a missing public route no longer leaves every local artifact in the catalog-unavailable state.
+
+ Keep catalog trust unchanged. The endpoint serves the exact signed envelope already bundled with Flowlight; catalog matching remains local, inventory is never uploaded, and signature, freshness, rollback, and recovery checks remain enforced.
+
+ Be clear about the initial catalog. This release contains an intentionally empty signed catalog. It enables a verified catalog state but does not claim that software is safe or report CVEs until a separately reviewed and offline-signed advisory catalog with real records is published.
+
  0.18.10
-November 24, 2026Latest
+November 24, 2026
 
  Identify executable versions on demand. Advisories now offers a visible page-level action that can run bounded --version checks for supported local tools such as curl, git, node, Python, and wget.
 
