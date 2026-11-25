@@ -27,6 +27,10 @@ OFFICIAL_PACK_PUBLIC_KEY = ROOT / "Flowlight/Resources/RulePacks/official-rule-p
 OFFICIAL_PACK_KEY_ID = "flowlight-rule-packs-2026-11"
 OFFICIAL_PACK_URL = "https://flowlight.xinbetween.com/packs/v1/official.json"
 OFFICIAL_PACK_PROVENANCE_URL = "https://flowlight.xinbetween.com/packs/v1/provenance/"
+ADVISORY_CATALOG_SOURCE = ROOT / "site/advisories/v1/catalog.json"
+ADVISORY_CATALOG_BUNDLED = ROOT / "Flowlight/Resources/Advisories/advisories.json"
+ADVISORY_CATALOG_OUTPUT = OUT / "advisories/v1/catalog.json"
+ADVISORY_CATALOG_URL = "https://flowlight.xinbetween.com/advisories/v1/catalog.json"
 REQUIRED_PROVENANCE_PACK_IDS = {"official.advertising", "official.advertising-aggressive"}
 PAGES_WORKFLOW = ROOT / ".github/workflows/pages.yml"
 APP_STORE_BADGE = OUT / "assets/app-store-badge.svg"
@@ -307,8 +311,56 @@ def homepage_installation_problems(source, label):
     return found
 
 
+def advisory_catalog_problems():
+    found = []
+    paths = (
+        ("site/advisories/v1/catalog.json", ADVISORY_CATALOG_SOURCE),
+        ("Flowlight/Resources/Advisories/advisories.json", ADVISORY_CATALOG_BUNDLED),
+        ("docs/advisories/v1/catalog.json", ADVISORY_CATALOG_OUTPUT),
+    )
+    for label, path in paths:
+        if path.is_symlink() or not path.is_file():
+            found.append(f"{label}: signed advisory catalog is missing or is not a regular file")
+    if found:
+        return found
+
+    source_bytes = ADVISORY_CATALOG_SOURCE.read_bytes()
+    bundled_bytes = ADVISORY_CATALOG_BUNDLED.read_bytes()
+    output_bytes = ADVISORY_CATALOG_OUTPUT.read_bytes()
+    if source_bytes != bundled_bytes:
+        found.append("site/advisories/v1/catalog.json: differs from bundled advisory catalog")
+    if source_bytes != output_bytes:
+        found.append("docs/advisories/v1/catalog.json: differs from site advisory catalog")
+
+    try:
+        envelope = json.loads(source_bytes)
+        payload = envelope["payload"]
+        signatures = envelope["signatures"]
+    except (KeyError, TypeError, json.JSONDecodeError) as error:
+        found.append(f"site/advisories/v1/catalog.json: unreadable signed envelope: {error}")
+        return found
+    if envelope.get("format") != 1 or not isinstance(payload, dict) or not isinstance(signatures, list):
+        found.append("site/advisories/v1/catalog.json: invalid signed envelope shape")
+        return found
+    expected = {
+        "catalogID": "flowlight.advisories",
+        "channel": "official",
+        "publisher": "Flowlight",
+        "sourceURL": ADVISORY_CATALOG_URL,
+    }
+    for key, value in expected.items():
+        if payload.get(key) != value:
+            found.append(f"site/advisories/v1/catalog.json: payload {key} is not {value!r}")
+    if not isinstance(payload.get("advisories"), list):
+        found.append("site/advisories/v1/catalog.json: payload advisories is not an array")
+    if not signatures:
+        found.append("site/advisories/v1/catalog.json: signed envelope has no signatures")
+    return found
+
+
 def problems():
     found = []
+    found.extend(advisory_catalog_problems())
 
     # The public catalog is a signed app update channel, not an ordinary generated asset. The source served by
     # Pages and the committed docs copy must be byte-for-byte identical, and verification uses the public key

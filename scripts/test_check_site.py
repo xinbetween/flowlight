@@ -11,6 +11,7 @@ import pathlib
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 SCRIPT = pathlib.Path(__file__).with_name("check_site.py")
@@ -167,6 +168,48 @@ class SiteBuildProvenanceTests(unittest.TestCase):
                 build_site.stale_provenance_paths(directory, {"current.json"}),
                 [directory / "nested" / "extra.bin"],
             )
+
+
+class AdvisoryCatalogPublicationTests(unittest.TestCase):
+    def fixture(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = pathlib.Path(temporary.name)
+        source = root / "site/advisories/v1/catalog.json"
+        bundled = root / "Flowlight/Resources/Advisories/advisories.json"
+        output = root / "docs/advisories/v1/catalog.json"
+        content = (pathlib.Path(__file__).parent.parent / "Flowlight/Resources/Advisories/advisories.json").read_bytes()
+        source.parent.mkdir(parents=True)
+        bundled.parent.mkdir(parents=True)
+        output.parent.mkdir(parents=True)
+        source.write_bytes(content)
+        bundled.write_bytes(content)
+        output.write_bytes(b"previous catalog")
+        return root, source, bundled, output, content
+
+    def test_publishes_exact_signed_bytes(self):
+        root, source, bundled, output, content = self.fixture()
+        published = build_site.publish_advisory_catalog_output(source, output, bundled, root)
+        self.assertEqual(published, content)
+        self.assertEqual(output.read_bytes(), content)
+
+    def test_bundle_mismatch_preserves_previous_output(self):
+        root, source, bundled, output, _ = self.fixture()
+        bundled.write_bytes(b"different signed bytes")
+        before = output.read_bytes()
+        with self.assertRaisesRegex(SystemExit, "differs from"):
+            build_site.publish_advisory_catalog_output(source, output, bundled, root)
+        self.assertEqual(output.read_bytes(), before)
+
+    def test_site_check_requires_exact_source_bundle_and_output(self):
+        _, source, bundled, output, content = self.fixture()
+        with patch.object(check_site, "ADVISORY_CATALOG_SOURCE", source), \
+             patch.object(check_site, "ADVISORY_CATALOG_BUNDLED", bundled), \
+             patch.object(check_site, "ADVISORY_CATALOG_OUTPUT", output):
+            output.write_bytes(content)
+            self.assertEqual(check_site.advisory_catalog_problems(), [])
+            output.write_bytes(b"stale catalog")
+            self.assertIn("docs/advisories/v1/catalog.json: differs from site advisory catalog", check_site.advisory_catalog_problems())
 
 
 class SidebarOrderTests(unittest.TestCase):
