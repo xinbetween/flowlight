@@ -13,6 +13,15 @@
 "Identified %lld of %lld executable versions; some remain unknown." = "Identified %lld of %lld executable versions; some remain unknown.";
 "Identified %lld of %lld executable versions." = "Identified %lld of %lld executable versions.";
 "Executable version output" = "Executable version output";
+"Packages" = "Packages";
+"Version identified" = "Version identified";
+"Version check not attempted" = "Version check not attempted";
+"Executable unavailable" = "Executable unavailable";
+"Version command failed" = "Version command failed";
+"Version check timed out" = "Version check timed out";
+"Version output exceeded the limit" = "Version output exceeded the limit";
+"Version check cancelled" = "Version check cancelled";
+"Version output not recognized" = "Version output not recognized";
 "Traffic spike" = "Traffic spike";
 "Unusual number of destinations" = "Unusual number of destinations";
 "First contact with domain" = "First contact with domain";

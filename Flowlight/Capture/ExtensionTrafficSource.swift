@@ -658,7 +658,7 @@ final class ExtensionTrafficSource: NSObject, TrafficSource, FlowlightAppXPC, @u
                     }
                     return
                 }
-                guard handshake.activeDigest != snapshot.digest else {
+                guard handshake.activeDigest != snapshot.digest || handshake.activeGeneration != snapshot.generation else {
                     self.finishRulePackPush(
                         epoch: epoch,
                         status: .init(

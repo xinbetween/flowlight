@@ -88,6 +88,30 @@ final class AdvisoryTests: XCTestCase {
         XCTAssertFalse(advisory.matches(wrongIdentity), "same text in another identity is not a match")
     }
 
+    func testGenericPackageMatchingRequiresTheSamePackageManager() {
+        let match = AdvisoryCPEMatch(
+            criteria: "cpe:2.3:a:example:shared:*:*:*:*:*:*:*:*",
+            targets: [AdvisoryTarget(kind: .package, identifier: "shared", packageManager: .npm)],
+            versionStartIncluding: "1.0.0",
+            versionEndExcluding: "2.0.0"
+        )
+        let advisory = SecurityAdvisory(
+            id: "CVE-2099-0004",
+            configurations: [AdvisoryConfiguration(nodes: [AdvisoryNode(matches: [match])])]
+        )
+        let npm = AdvisoryArtifact(kind: .package, identifier: "shared", name: "shared", path: "/tmp/npm/shared",
+                                   version: "1.5.0", versionScheme: .semver, identityEvidence: .packageManifest,
+                                   versionEvidence: .packageMetadata, source: "npm", iconPath: nil,
+                                   packageManager: .npm)
+        let cargo = AdvisoryArtifact(kind: .package, identifier: "shared", name: "shared", path: "/tmp/cargo/shared",
+                                     version: "1.5.0", versionScheme: .semver, identityEvidence: .packageManifest,
+                                     versionEvidence: .packageMetadata, source: "Cargo", iconPath: nil,
+                                     packageManager: .cargo)
+
+        XCTAssertTrue(advisory.matches(npm))
+        XCTAssertFalse(advisory.matches(cargo))
+    }
+
     func testBundledAdvisoryCatalogBootstrapsWithProductionTrust() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let url = root.appendingPathComponent("Flowlight/Resources/Advisories/advisories.json")
@@ -135,6 +159,66 @@ final class AdvisoryTests: XCTestCase {
         XCTAssertNoThrow(try AdvisoryCatalogVerifier.verify(
             data: JSONEncoder().encode(envelope), trustedSigners: [signer], now: 1_800_000_000
         ))
+    }
+
+    func testSignedGenericPackageTargetAcceptsManagerAndMatchesOnlyThatEcosystem() throws {
+        let key = P256.Signing.PrivateKey()
+        let match = AdvisoryCPEMatch(
+            criteria: "cpe:2.3:a:example:shared:*:*:*:*:*:*:*:*",
+            targets: [AdvisoryTarget(kind: .package, identifier: "shared", packageManager: .npm)],
+            versionStartIncluding: "1.0.0",
+            versionEndExcluding: "2.0.0"
+        )
+        let advisory = AdvisoryCatalogWireAdvisory(
+            id: "CVE-2099-0101",
+            summary: "Test package advisory",
+            configurations: [AdvisoryConfiguration(nodes: [AdvisoryNode(matches: [match])])]
+        )
+        let payload = AdvisoryCatalogPayload(
+            catalogID: AdvisoryCatalogVerifier.catalogID,
+            channel: AdvisoryCatalogVerifier.channel,
+            sourceURL: AdvisoryCatalogVerifier.sourceURL,
+            sequence: 1,
+            issuedAt: 1_799_000_000,
+            expiresAt: 1_900_000_000,
+            publisher: AdvisoryCatalogVerifier.publisher,
+            advisories: [advisory]
+        )
+        var envelope = AdvisoryCatalogEnvelope(format: AdvisoryCatalogVerifier.catalogFormat, payload: payload, signatures: [])
+        let signature = try key.signature(for: AdvisoryCatalogVerifier.canonicalPayload(for: envelope))
+        envelope.signatures = [AdvisoryCatalogSignature(
+            algorithm: AdvisoryCatalogVerifier.signatureAlgorithm,
+            keyID: "test-package-key",
+            value: signature.derRepresentation.base64EncodedString()
+        )]
+        let signer = AdvisoryCatalogTrustedSigner(
+            keyID: "test-package-key", publisher: AdvisoryCatalogVerifier.publisher,
+            catalogID: AdvisoryCatalogVerifier.catalogID, advisoryIDPrefix: "CVE-",
+            publicKeyPEM: key.publicKey.pemRepresentation,
+            validFrom: 1_790_000_000, validUntil: 1_900_000_000
+        )
+
+        let verified = try AdvisoryCatalogVerifier.verify(
+            data: JSONEncoder().encode(envelope), trustedSigners: [signer], now: 1_800_000_000
+        )
+        let npm = AdvisoryArtifact(kind: .package, identifier: "shared", name: "shared", path: "/tmp/npm/shared",
+                                   version: "1.5.0", versionScheme: .semver, identityEvidence: .packageManifest,
+                                   versionEvidence: .packageMetadata, source: "npm", iconPath: nil,
+                                   packageManager: .npm)
+        let nodePackage = AdvisoryArtifact(kind: .nodePackage, identifier: "shared", name: "shared",
+                                           path: "/tmp/node_modules/shared", version: "1.5.0",
+                                           versionScheme: .semver, identityEvidence: .packageManifest,
+                                           versionEvidence: .packageJSON, source: "package.json", iconPath: nil,
+                                           packageManager: .npm)
+        let cargo = AdvisoryArtifact(kind: .package, identifier: "shared", name: "shared", path: "/tmp/cargo/shared",
+                                     version: "1.5.0", versionScheme: .semver, identityEvidence: .packageManifest,
+                                     versionEvidence: .packageMetadata, source: "Cargo", iconPath: nil,
+                                     packageManager: .cargo)
+
+        let decodedAdvisory = try XCTUnwrap(verified.advisories.first)
+        XCTAssertTrue(decodedAdvisory.matches(npm))
+        XCTAssertTrue(decodedAdvisory.matches(nodePackage))
+        XCTAssertFalse(decodedAdvisory.matches(cargo))
     }
 
     func testTypedTargetCatalogRoundTripsAlongsideLegacyBundleIDs() throws {

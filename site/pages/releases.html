@@ -13,7 +13,19 @@ nav: releases
   <div class="wrap" style="padding-block:8px 96px">
     <article class="prose" style="max-width:820px;gap:28px">
       <section class="release">
-        <header><h2>0.18.10</h2><time datetime="2026-11-24">November 24, 2026</time><span class="tag">Latest</span></header>
+        <header><h2>0.18.11</h2><time datetime="2026-11-25">November 25, 2026</time><span class="tag">Latest</span></header>
+        <ul>
+          <li><strong>Make advisory catalog availability verifiable.</strong> Flowlight now ships the signed advisory catalog at the endpoint used by the app, so a missing public route no longer leaves every local artifact in the catalog-unavailable state.</li>
+          <li><strong>Keep catalog trust unchanged.</strong> The endpoint serves the exact signed envelope already bundled with Flowlight; catalog matching remains local, inventory is never uploaded, and signature, freshness, rollback, and recovery checks remain enforced.</li>
+          <li><strong>Be clear about the initial catalog.</strong> This release contains an intentionally empty signed catalog. It enables a verified catalog state but does not claim that software is safe or report CVEs until a separately reviewed and offline-signed advisory catalog with real records is published.</li>
+          <li><strong>Recover HTTPS inspection safely.</strong> Inspection remembers enabled intent across relaunches and upgrades, while remaining stopped until the extension confirms the exact rule-pack generation and digest. A visible retry action recovers temporary synchronization failures without weakening the fail-closed barrier.</li>
+          <li><strong>Make version evidence useful.</strong> Explicit, bounded profiles cover common tools such as Wget, Swift, kubectl, Python, and Pip, with a specific reason when a version cannot be identified.</li>
+          <li><strong>Group package inventory clearly.</strong> Homebrew, npm, and bounded metadata-only coverage for ten language package ecosystems appear under one Packages filter while ecosystem-qualified identities remain separate for advisory matching.</li>
+        </ul>
+      </section>
+
+      <section class="release">
+        <header><h2>0.18.10</h2><time datetime="2026-11-24">November 24, 2026</time></header>
         <ul>
           <li><strong>Identify executable versions on demand.</strong> Advisories now offers a visible page-level action that can run bounded <code>--version</code> checks for supported local tools such as curl, git, node, Python, and wget.</li>
           <li><strong>Keep execution explicit and local.</strong> Metadata-only inventory scanning remains automatic; executable checks require the Advisories action, use fixed arguments and canonical paths, and never upload inventory or probe output.</li>

@@ -913,6 +913,24 @@ final class TrafficMonitor: ObservableObject {
         }
     }
 
+    /// Re-send the desired managed-pack snapshot after a stale or mismatched extension acknowledgement.
+    /// This remains fail-closed: inspection stays stopped until the exact generation and digest commit.
+    func retryRulePackSynchronization() {
+        guard rulePacks.hasEnabledPacks else { return }
+        guard source != nil else {
+            inspection.lastError = L("The filter is unavailable. Reconnect the Network Extension, then retry synchronization.")
+            refreshRulePackRuntimeDiagnostics()
+            return
+        }
+        liveRulePacks.replace(snapshot: nil)
+        inspectionRulePacksReady = false
+        attachInspectionWhenPolicyStateIsReady()
+        rulePacks.updateStatus(.applying)
+        inspection.lastError = L("Waiting for the filter to acknowledge the exact managed-policy snapshot.")
+        source?.setRulePacks(rulePacks.snapshot)
+        refreshRulePackRuntimeDiagnostics()
+    }
+
     private func refreshRulePackRuntimeDiagnostics() {
         let desired = rulePacks.snapshot
         let extensionResult = latestRulePackApplyResult

@@ -11,6 +11,15 @@
 "Identified %lld of %lld executable versions; some remain unknown." = "실행 파일 버전 %lld/%lld개를 식별했습니다. 일부는 알 수 없습니다.";
 "Identified %lld of %lld executable versions." = "실행 파일 버전 %lld/%lld개를 식별했습니다.";
 "Executable version output" = "실행 파일 버전 출력";
+"Packages" = "패키지";
+"Version identified" = "버전 식별됨";
+"Version check not attempted" = "버전 확인을 시도하지 않음";
+"Executable unavailable" = "실행 파일을 사용할 수 없음";
+"Version command failed" = "버전 명령 실패";
+"Version check timed out" = "버전 확인 시간 초과";
+"Version output exceeded the limit" = "버전 출력이 제한을 초과함";
+"Version check cancelled" = "버전 확인 취소됨";
+"Version output not recognized" = "버전 출력을 인식할 수 없음";
 "Traffic spike" = "트래픽 급증";
 "Unusual number of destinations" = "비정상적으로 많은 목적지";
 "First contact with domain" = "도메인 첫 연결";

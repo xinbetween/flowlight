@@ -67,10 +67,13 @@ struct AdvisoryNode: Codable, Equatable, Hashable, Sendable {
 struct AdvisoryTarget: Codable, Equatable, Hashable, Sendable {
     var kind: AdvisoryArtifactKind
     var identifier: String
+    /// Required for generic package targets; nil preserves the legacy kind-qualified wire format.
+    var packageManager: AdvisoryPackageManager?
 
-    init(kind: AdvisoryArtifactKind, identifier: String) {
+    init(kind: AdvisoryArtifactKind, identifier: String, packageManager: AdvisoryPackageManager? = nil) {
         self.kind = kind
         self.identifier = identifier
+        self.packageManager = packageManager
     }
 }
 
@@ -139,7 +142,25 @@ struct AdvisoryCPEMatch: Codable, Equatable, Hashable, Sendable {
             return true
         }
         return targets.contains {
-            $0.kind == artifact.kind && $0.identifier.caseInsensitiveCompare(artifact.identifier) == .orderedSame
+            let targetManager = $0.packageManager ?? Self.legacyPackageManager(for: $0.kind)
+            let artifactManager = artifact.packageManager ?? Self.legacyPackageManager(for: artifact.kind)
+            let samePackageFamily = $0.kind.isPackage && artifact.kind.isPackage
+                && targetManager != nil && artifactManager != nil
+            guard ($0.kind == artifact.kind || samePackageFamily),
+                  $0.identifier.caseInsensitiveCompare(artifact.identifier) == .orderedSame else { return false }
+            if $0.kind.isPackage || artifact.kind.isPackage {
+                return targetManager == artifactManager
+            }
+            return true
+        }
+    }
+
+    private static func legacyPackageManager(for kind: AdvisoryArtifactKind) -> AdvisoryPackageManager? {
+        switch kind {
+        case .homebrewFormula: return .homebrewFormula
+        case .homebrewCask: return .homebrewCask
+        case .nodePackage: return .npm
+        case .application, .executable, .package: return nil
         }
     }
 

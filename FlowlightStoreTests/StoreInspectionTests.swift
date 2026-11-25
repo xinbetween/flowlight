@@ -85,8 +85,9 @@ final class StoreInspectionTests: XCTestCase {
         XCTAssertFalse(controller.enabled, "turning inspection off must remain available while policy state loads")
 
         controller.setEnabled(true)
-        XCTAssertFalse(controller.enabled, "turning inspection on must wait for the complete policy publication")
-        XCTAssertFalse(controller.running)
+        XCTAssertTrue(controller.enabled, "the user's enabled intent must persist while policy publication is pending")
+        XCTAssertFalse(controller.policyStateReady)
+        XCTAssertFalse(controller.running, "the proxy must remain stopped until the complete policy publication is ready")
     }
 
     func testStoreReadinessRequiresTheCompleteAttributionHandshake() {

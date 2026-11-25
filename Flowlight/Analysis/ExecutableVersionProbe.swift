@@ -56,12 +56,38 @@ struct ExecutableVersionProbe: Sendable {
     private let runner: Runner
     private let pathValidator: PathValidator
 
-    /// These tools have stable, conventional `--version` behavior and are commonly found in the bounded roots.
-    /// Unknown executables remain visible in the inventory but are not launched.
-    private static let supportedTools: Set<String> = [
-        "brew", "cargo", "curl", "docker", "ffmpeg", "gh", "git", "go", "jq", "kubectl", "node", "npm",
-        "npx", "openssl", "perl", "podman", "python", "python3", "ruby", "rustc", "swift", "terraform", "wget"
-    ]
+    private enum Parser: Sendable {
+        case strict
+        case banner
+        case regex(String)
+    }
+
+    private struct Profile: Sendable {
+        var aliases: Set<String>
+        var arguments: [String]
+        var parser: Parser
+    }
+
+    /// Profiles are static application code: catalog data and discovered filenames never select a command or
+    /// argument. Unknown executables remain visible in the inventory but are never launched.
+    private static let profiles: [String: Profile] = {
+        let strictNames = ["brew", "cargo", "curl", "docker", "ffmpeg", "gh", "git", "go", "jq", "node", "npm",
+                           "npx", "openssl", "perl", "podman", "ruby", "rustc", "terraform"]
+        var result = Dictionary(uniqueKeysWithValues: strictNames.map {
+            ($0, Profile(aliases: [$0], arguments: ["--version"], parser: .strict))
+        })
+        result["wget"] = Profile(aliases: ["wget"], arguments: ["--version"],
+                                  parser: .regex(#"(?i)GNU\s+Wget\s+v?([0-9]+(?:\.[0-9]+){1,3})"#))
+        result["swift"] = Profile(aliases: ["swift"], arguments: ["--version"],
+                                   parser: .regex(#"(?i)Apple\s+Swift\s+version\s+v?([0-9]+(?:\.[0-9]+){1,3})"#))
+        result["kubectl"] = Profile(aliases: ["kubectl"], arguments: ["version", "--client", "--output=json"],
+                                     parser: .regex(#"(?i)(?:gitVersion|clientVersion)"\s*:\s*"v?([0-9]+(?:\.[0-9]+){1,3})"#))
+        result["python"] = Profile(aliases: ["python"], arguments: ["--version"], parser: .banner)
+        result["python3"] = Profile(aliases: ["python3"], arguments: ["--version"], parser: .banner)
+        result["pip"] = Profile(aliases: ["pip"], arguments: ["--version"], parser: .banner)
+        result["pip3"] = Profile(aliases: ["pip3"], arguments: ["--version"], parser: .banner)
+        return result
+    }()
 
     init(configuration: Configuration = Configuration(), runner: Runner? = nil,
          pathValidator: @escaping PathValidator = { url in ExecutableVersionProbe.isSafeExecutable(url) }) {
@@ -74,12 +100,23 @@ struct ExecutableVersionProbe: Sendable {
 
     var maximumProbes: Int { configuration.maximumProbes }
 
+    private static func profile(for executable: String) -> Profile? {
+        let name = executable.lowercased()
+        if let profile = profiles[name] { return profile }
+        if name.range(of: #"^python3(?:\.[0-9]+)+$"#, options: .regularExpression) != nil { return profiles["python3"] }
+        if name.range(of: #"^python(?:\.[0-9]+)+$"#, options: .regularExpression) != nil { return profiles["python"] }
+        if name.range(of: #"^pip3(?:\.[0-9]+)+$"#, options: .regularExpression) != nil { return profiles["pip3"] }
+        if name.range(of: #"^pip(?:\.[0-9]+)+$"#, options: .regularExpression) != nil { return profiles["pip"] }
+        return nil
+    }
+
     static func isEligible(_ artifact: AdvisoryArtifact) -> Bool {
-        artifact.kind == .executable && supportedTools.contains(artifact.identifier.lowercased())
+        artifact.kind == .executable && profile(for: artifact.executionAlias ?? artifact.identifier) != nil
     }
 
     func probe(_ artifact: AdvisoryArtifact) async -> Result {
-        guard Self.isEligible(artifact) else {
+        let expectedExecutable = artifact.executionAlias ?? artifact.identifier
+        guard let profile = Self.profile(for: expectedExecutable), artifact.kind == .executable else {
             return .notAttempted
         }
         let url = URL(fileURLWithPath: artifact.path).standardizedFileURL
@@ -88,12 +125,12 @@ struct ExecutableVersionProbe: Sendable {
         }
         guard !Task.isCancelled else { return Result(status: .cancelled, version: nil) }
 
-        let raw = await runner(url, ["--version"], configuration)
+        let raw = await runner(url, profile.arguments, configuration)
         if raw.cancelled || Task.isCancelled { return Result(status: .cancelled, version: nil) }
         if raw.outputLimitExceeded { return Result(status: .outputLimitExceeded, version: nil) }
         if raw.timedOut { return Result(status: .timedOut, version: nil) }
         guard raw.exitCode == 0 else { return Result(status: .nonZeroExit, version: nil) }
-        guard let version = Self.parseVersion(from: raw.output, expectedExecutable: artifact.identifier) else {
+        guard let version = Self.parseVersion(from: raw.output, expectedExecutable: expectedExecutable) else {
             return Result(status: .invalidOutput, version: nil)
         }
         return Result(status: .found, version: version)
@@ -117,19 +154,45 @@ struct ExecutableVersionProbe: Sendable {
     /// otherwise valid result ambiguous. The executable name is supplied by the bounded allowlist, never output.
     static func parseVersion(from data: Data, expectedExecutable: String) -> String? {
         guard let output = String(data: data, encoding: .utf8) else { return nil }
-        if let strict = parseVersion(from: output) { return strict }
+        guard let profile = profile(for: expectedExecutable) else {
+            return parseExpectedPrefixVersion(from: output, expectedExecutable: expectedExecutable)
+        }
+        switch profile.parser {
+        case .strict:
+            return parseVersion(from: output) ?? parseExpectedPrefixVersion(from: output, expectedExecutable: expectedExecutable)
+        case .banner:
+            return parseExpectedPrefixVersion(from: output, expectedExecutable: expectedExecutable)
+        case let .regex(pattern):
+            return firstVersionMatch(in: output, pattern: pattern)
+        }
+    }
 
+    private static func parseExpectedPrefixVersion(from output: String, expectedExecutable: String) -> String? {
         guard let firstLine = output.split(whereSeparator: { $0.isNewline }).first else { return nil }
         let line = String(firstLine).trimmingCharacters(in: .whitespacesAndNewlines)
         let expected = expectedExecutable.lowercased()
-        let aliases: Set<String> = expected == "python3" ? ["python", "python3"] : [expected]
+        let aliases: Set<String> = {
+            if expected.hasPrefix("python3") { return ["python", "python3"] }
+            if expected.hasPrefix("python") { return ["python"] }
+            if expected.hasPrefix("pip3") { return ["pip", "pip3"] }
+            if expected.hasPrefix("pip") { return ["pip"] }
+            return [expected]
+        }()
         guard let alias = aliases.first(where: { candidate in
             line.lowercased() == candidate || line.lowercased().hasPrefix(candidate + " ")
         }) else { return nil }
-
         let remainder = line.dropFirst(alias.count).trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "^version\\s+", with: "", options: [.regularExpression, .caseInsensitive])
         return versionMatches(in: String(remainder)).first
+    }
+
+    private static func firstVersionMatch(in output: String, pattern: String) -> String? {
+        guard let expression = try? NSRegularExpression(pattern: pattern, options: []) else { return nil }
+        let range = NSRange(output.startIndex..<output.endIndex, in: output)
+        guard let match = expression.firstMatch(in: output, range: range),
+              let versionRange = Range(match.range(at: 1), in: output) else { return nil }
+        let version = String(output[versionRange])
+        return VersionRangeMatcher.isUsable(version: version, scheme: .opaque) ? version : nil
     }
 
     private static func versionMatches(in output: String) -> [String] {
