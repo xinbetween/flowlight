@@ -421,22 +421,31 @@ struct AgentsView: View {
             let granularity = key.scope.window.granularity
             let focusScope = key.scope.focus
             let stress = DemoData.isAgentsStress
+            // A mounted Agents page can be waiting on its first snapshot or a refresh while macOS
+            // throttles the app. Mark only the in-flight load as user-facing and still allow system sleep.
+            let activity = ProcessInfo.processInfo.beginActivity(options: .userInitiatedAllowingIdleSystemSleep,
+                                                                 reason: "Loading AI Agents activity")
+            defer { ProcessInfo.processInfo.endActivity(activity) }
             var result: AgentsViewSnapshot?
             var timings: [String] = []
             do {
                 let queued = ContinuousClock.now
-                let (read, readStart, readEnd) = try await monitor.read { db in
+                let (read, readStart, readEnd, readCPU) = try await monitor.read { db in
                     let readStart = ContinuousClock.now
+                    let cpuStart = stress ? clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID) : 0
                     let result = try AgentsModel.read(db, granularity: granularity, from: from, to: to, focus: focusScope,
                                                       stress: stress, cancellation: cancellation)
-                    return (result, readStart, ContinuousClock.now)
+                    let cpu = stress ? Double(clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID) - cpuStart) / 1e6 : 0
+                    return (result, readStart, ContinuousClock.now, cpu)
                 }
                 let readResumed = ContinuousClock.now
                 try cancellation.check()
-                let (derived, deriveStart, deriveEnd) = try await Task.detached(priority: .utility) {
+                let (derived, deriveStart, deriveEnd, deriveCPU) = try await Task.detached(priority: .utility) {
                     let deriveStart = ContinuousClock.now
+                    let cpuStart = stress ? clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID) : 0
                     let result = try AgentsModel.derive(read, input: input, stress: stress, cancellation: cancellation)
-                    return (result, deriveStart, ContinuousClock.now)
+                    let cpu = stress ? Double(clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID) - cpuStart) / 1e6 : 0
+                    return (result, deriveStart, ContinuousClock.now, cpu)
                 }.value
                 let deriveResumed = ContinuousClock.now
                 try cancellation.check()
@@ -444,9 +453,11 @@ struct AgentsView: View {
                 if stress {
                     timings = ["queueMs=\(queued.milliseconds(to: readStart))",
                                "readMs=\(readStart.milliseconds(to: readEnd))",
+                               "readCPUMs=\(readCPU)",
                                "readResumeMs=\(readEnd.milliseconds(to: readResumed))",
                                "deriveQueueMs=\(readResumed.milliseconds(to: deriveStart))",
                                "deriveMs=\(deriveStart.milliseconds(to: deriveEnd))",
+                               "deriveCPUMs=\(deriveCPU)",
                                "deriveResumeMs=\(deriveEnd.milliseconds(to: deriveResumed))"]
                 }
             } catch is CancellationError {
