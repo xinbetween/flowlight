@@ -70,7 +70,7 @@ History groups any traffic still without a hostname under its network owner.
 ## Building
 
 ```sh
-brew install xcodegen  # project regeneration requires exactly 2.46.0
+brew install xcodegen  # project regeneration supports 2.46.0, 2.47.0, and 2.48.0
 scripts/check_xcode_project.sh --write
 
 # Any Mac, no entitlements: ad-hoc signed, nettop fallback only
