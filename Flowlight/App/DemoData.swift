@@ -23,6 +23,7 @@ enum DemoData {
         launchFlag("FLDemo") || launchFlag("FLDemoAlertReview") || recognizedUITestScreen || xctestDemoHarness
     }
     static var showsPackReview: Bool { launchFlag("FLDemoPackReview") }
+    static var isAgentsStress: Bool { launchFlag("FLDemo") && launchFlag("FLDemoAgentsStress") }
 
     /// The live UI screen is also a recognized test launch contract; it keeps this fixture deterministic on Xcode
     /// hosts that strip one custom boolean argument while retaining the demo-mode guard.
@@ -452,13 +453,15 @@ final class DemoTrafficSource: TrafficSource, @unchecked Sendable {
     var displayName: String { L("Demo data") }
     private var timer: DispatchSourceTimer?
     private var rng = SeededGenerator(seed: UInt64(Date().timeIntervalSince1970))
+    private let stress = DemoData.isAgentsStress
 
     func start(sink: @escaping ([TrafficBatch]) -> Void, status: @escaping (String) -> Void) {
         let timer = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
         timer.schedule(deadline: .now() + 1, repeating: 1)
         timer.setEventHandler { [weak self] in
             guard let self else { return }
-            sink([self.batch(at: Int64(Date().timeIntervalSince1970) - 1)])
+            let second = Int64(Date().timeIntervalSince1970) - 1
+            sink([self.stress ? DemoAgentsStress.batch(at: second) : self.batch(at: second)])
         }
         timer.resume()
         self.timer = timer

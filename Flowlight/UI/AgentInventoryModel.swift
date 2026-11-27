@@ -57,6 +57,8 @@ struct AgentInventoryPolicyCoverage: Sendable, Equatable {
     var enabled: Bool
     var enforcing: Bool
     var uncoveredDestinations: Int
+    var isPartial = false
+    var uncoveredKeys: Set<String> = []
 }
 
 struct AgentInventoryItem: Identifiable, Sendable, Equatable {
@@ -102,6 +104,9 @@ struct AgentInventoryInput: Sendable {
     var guardrailAgentIDs: [String] = []
     var alerts: [AlertRecord] = []
     var openAlertCounts: [AgentOpenAlertCount] = []
+    /// Nil for legacy callers constructing inventory from their own traffic summaries.
+    var policyEndpoints: [String: [AgentTrafficProjection.Endpoint]]?
+    var cancellation: TrafficReadCancellation?
 }
 
 /// Builds the complete agent inventory from injected snapshots. It performs no disk, database, process, defaults, or
@@ -209,6 +214,8 @@ enum AgentInventoryBuilder {
         let canonical = ordered[0]
         var ai = FlowCounters()
         var egress = FlowCounters()
+        var local = FlowCounters()
+        var omittedRelationships = 0
         var providers: [String: FlowCounters] = [:]
         var destinations: [String: AgentDestination] = [:]
         var tools: [String: AgentTool] = [:]
@@ -217,6 +224,8 @@ enum AgentInventoryBuilder {
         for summary in ordered {
             ai += summary.ai
             egress += summary.egress
+            local += summary.local
+            omittedRelationships += summary.omittedRelationships
             alerts += summary.alerts
             for provider in summary.providers {
                 providers[provider.name, default: FlowCounters()] += provider.counters
@@ -265,7 +274,7 @@ enum AgentInventoryBuilder {
             tools: tools.values.sorted {
                 $0.counters.total == $1.counters.total ? $0.id < $1.id : $0.counters.total > $1.counters.total
             },
-            alerts: alerts
+            alerts: alerts, local: local, omittedRelationships: omittedRelationships
         )
     }
 
@@ -303,7 +312,8 @@ enum AgentInventoryBuilder {
         )
         let monitored = !aliases.isDisjoint(with: monitoredIdentityKeys)
         let route = routeState(aliases: aliases, routes: routeStatesByIdentity, monitored: monitored)
-        let policy = policyCoverage(identityPriority: identityPriority, summary: summary, policies: input.policies)
+        let policy = policyCoverage(identityPriority: identityPriority, summary: summary,
+                                    roots: evidence.summaries.map(\.bundleID), input: input)
         let matchingAlertGroups = aliases.reduce(into: Set<Int>()) { groupIDs, identity in
             groupIDs.formUnion(openAlertGroupIDsByIdentity[identity] ?? [])
         }
@@ -437,17 +447,33 @@ enum AgentInventoryBuilder {
         return .notRequested
     }
 
-    private static func policyCoverage(identityPriority: [String], summary: AgentSummary?,
-                                       policies: [String: AgentPolicy]) -> AgentInventoryPolicyCoverage {
-        guard let policy = AgentPolicy.resolve(policies.values, identities: identityPriority),
-              policy.enabled else {
+    private static func policyCoverage(identityPriority: [String], summary: AgentSummary?, roots: [String],
+                                       input: AgentInventoryInput) -> AgentInventoryPolicyCoverage {
+        guard let policy = AgentPolicy.resolve(input.policies.values, identities: identityPriority), policy.enabled else {
             return AgentInventoryPolicyCoverage(enabled: false, enforcing: false, uncoveredDestinations: 0)
         }
-        let uncovered = summary?.destinations.filter {
-            !policy.allows(host: $0.hasHostname ? $0.label : "", ip: $0.ip, isAIProvider: $0.provider != nil)
-        }.count ?? 0
+        var uncovered = Set<String>()
+        if let full = input.policyEndpoints {
+            for root in roots {
+                for endpoint in full[root] ?? [] {
+                    if input.cancellation?.isCancelled == true { break }
+                    let key = endpoint.destinationKey
+                    if !uncovered.contains(key), !policy.allows(host: endpoint.host, ip: endpoint.ip,
+                                                                isAIProvider: endpoint.isProvider) {
+                        uncovered.insert(key)
+                    }
+                }
+            }
+        } else {
+            for destination in summary?.destinations ?? [] where !policy.allows(
+                host: destination.hasHostname ? destination.label : "", ip: destination.ip,
+                isAIProvider: destination.provider != nil
+            ) { uncovered.insert(destination.policyKey) }
+        }
         return AgentInventoryPolicyCoverage(enabled: true, enforcing: policy.enforce,
-                                            uncoveredDestinations: uncovered)
+                                            uncoveredDestinations: uncovered.count,
+                                            isPartial: input.policyEndpoints == nil && (summary?.omittedRelationships ?? 0) > 0,
+                                            uncoveredKeys: uncovered)
     }
 
     private static func health(observed: Bool, installed: Bool, configured: Bool, monitored: Bool,
@@ -463,8 +489,8 @@ enum AgentInventoryBuilder {
             || inspection.enabled && (!inspection.running || !inspection.certificateTrusted)) {
             return .needsSetup
         }
-        guard inspection.available, inspection.enabled, inspection.running, inspection.certificateTrusted,
-              route == .observed else { return .limitedVisibility }
+        guard !policy.isPartial, inspection.available, inspection.enabled, inspection.running,
+              inspection.certificateTrusted, route == .observed else { return .limitedVisibility }
         return .healthy
     }
 
@@ -517,11 +543,12 @@ enum AgentInventoryBuilder {
                 reasons.append(policy.uncoveredDestinations == 1
                     ? L("One observed destination is outside its policy.")
                     : L("%lld observed destinations are outside its policy.", policy.uncoveredDestinations))
-            } else {
+            } else if !policy.isPartial && observed {
                 reasons.append(policy.enforcing
                     ? L("Its enforcing destination policy covers the observed traffic.")
                     : L("Its reporting destination policy covers the observed traffic."))
             }
+            if policy.isPartial { reasons.append(L("Destination policy coverage is partial.")) }
         } else if observed || configured || monitored {
             reasons.append(L("No agent destination policy is enabled."))
         }

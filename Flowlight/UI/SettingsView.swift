@@ -141,7 +141,7 @@ private struct AdvisoryCatalogSettingsSection: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(L("Selected project folders"))
                 if projectRoots.isEmpty {
-                    Text(L("None. Node packages are inspected only in folders you choose."))
+                    Text(L("None selected. The Advisories page also performs a bounded home-folder package scan."))
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
                     ForEach(projectRoots) { root in
@@ -157,7 +157,7 @@ private struct AdvisoryCatalogSettingsSection: View {
                 Button { chooseProjectRoot() } label: {
                     Label(L("Add project folder…"), systemImage: "plus")
                 }
-                .help(L("Choose a bounded project folder; the whole home directory is never scanned"))
+                .help(L("Choose an additional bounded project folder; home-folder scanning is controlled on Advisories"))
             }
 
             Button(L("Refresh advisory catalog now")) {
@@ -170,7 +170,7 @@ private struct AdvisoryCatalogSettingsSection: View {
         } header: {
             Text(L("Software advisories"))
         } footer: {
-            Text(L("Matching is local and advisory-only. Standard application, executable, and Homebrew locations are bounded; node_modules is inspected only under selected folders. Clearing this data removes the cached catalog and its local matches."))
+            Text(L("Matching is local and advisory-only. Standard application, executable, Homebrew, and home-folder package locations are bounded; system, generated, and cache folders are skipped. Clearing this data removes the cached catalog and its local matches."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -186,15 +186,9 @@ private struct AdvisoryCatalogSettingsSection: View {
         }
     }
 
+    @MainActor
     private func chooseProjectRoot() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = L("Choose")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        let bookmark = try? url.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
-        let root = AdvisoryInventoryRoot(path: url.standardizedFileURL.path, userSelected: true, bookmarkData: bookmark)
+        guard let root = AdvisoryProjectFolderPicker.choose() else { return }
         guard !projectRoots.contains(where: { $0.id == root.id }) else { return }
         projectRoots.append(root)
         projectRoots.sort { $0.path.localizedCaseInsensitiveCompare($1.path) == .orderedAscending }

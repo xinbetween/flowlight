@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import Foundation
+import Observation
 
 struct LiveTalker: Identifiable, Equatable {
     var bundleID: String
@@ -72,6 +73,16 @@ final class TrafficLiveState: ObservableObject {
     }
 }
 
+/// Alert bursts only invalidate views that read the badge.
+@MainActor @Observable
+final class TrafficAlertBadge {
+    private(set) var count = 0
+
+    func publish(_ next: Int) {
+        if count != next { count = next }
+    }
+}
+
 /// Owns the capture source, database, anomaly engine and live state.
 @MainActor
 final class TrafficMonitor: ObservableObject {
@@ -88,7 +99,11 @@ final class TrafficMonitor: ObservableObject {
     private var sessionInTotal: Int64 = 0
     private var sessionOutTotal: Int64 = 0
     /// Sidebar badge count. The compatibility name is retained, but this is explicitly the number in `new` state.
-    @Published private(set) var unacknowledgedAlerts = 0
+    let alertBadge = TrafficAlertBadge()
+    private(set) var unacknowledgedAlerts: Int {
+        get { alertBadge.count }
+        set { alertBadge.publish(newValue) }
+    }
     @Published private(set) var captureState: PacketSniffer.State = .stopped
     @Published private(set) var hostnamesLearned = 0
     /// Share of traffic in the last hour with a hostname / with at least a network owner, plus whether the window has evidence.
@@ -99,6 +114,7 @@ final class TrafficMonitor: ObservableObject {
     private static let onboardingKey = "onboarding.captureOffered"
     private var lastDataAt: Date?
     @Published private(set) var dataVersion = 0 // bumps after each rollup so reports can refresh
+    private var demoAgentsProbe: DemoAgentsMainQueueProbe?
     /// Set when the chosen capture source cannot work on this Mac, with an explanation. Nil when it's fine.
     @Published private(set) var captureWarning: String?
     /// Set once the extension source has exhausted its recovery ladder and the sampler has taken over. The chosen
@@ -262,12 +278,6 @@ final class TrafficMonitor: ObservableObject {
                 #endif
             }
         }
-        // The disposable alert fixture must expose its badge before the menu-bar scene is queried. Its row count is
-        // deterministic, so publish the fixture contract synchronously instead of racing an asynchronous database
-        // callback against StateObject retention in the newest Xcode UI host.
-        if DemoData.isUITesting {
-            unacknowledgedAlerts = DemoData.alertReviewNewCount
-        }
         readDB = (try? TrafficDatabase(url: db.url, readOnly: true)) ?? db
         advisories.attach(db: db)
         engine = AnomalyEngine(db: db, activity: activity)
@@ -301,12 +311,19 @@ final class TrafficMonitor: ObservableObject {
             db: db,
             store: advisories,
             bundledCatalog: {
-                guard let url = Bundle.main.url(forResource: "advisories", withExtension: "json", subdirectory: "Advisories") else {
+                // Xcode may flatten a resource-group folder into Resources. Accept both layouts so the
+                // signed bundled snapshot is available in local/demo and App Store products alike.
+                guard let url = Bundle.main.url(forResource: "advisories", withExtension: "json", subdirectory: "Advisories")
+                    ?? Bundle.main.url(forResource: "advisories", withExtension: "json") else {
                     throw AdvisoryCatalogPersistenceError.invalidCatalogID
                 }
                 return try Data(contentsOf: url)
             }
         )
+        // Expose the disposable review badge before the menu-bar scene can first query it.
+        if DemoData.isUITesting {
+            unacknowledgedAlerts = DemoData.alertReviewNewCount
+        }
         Task { @MainActor [weak self] in
             guard let self else { return }
             await self.advisoryCatalog.bootstrap()
@@ -371,7 +388,25 @@ final class TrafficMonitor: ObservableObject {
         }
         // Geometry-level UI tests seed only the exact policy controls they exercise. The full 90-day demo fixture
         // would otherwise occupy the shared SQLite queue while those tests save a managed-pack review.
-        if DemoData.shouldSeedBulkHistory {
+        if DemoData.isAgentsStress {
+            db.async { [weak self] db in
+                do {
+                    try DemoAgentsStress.seed(db)
+                    NSLog("AGENTS_STRESS_SEED_READY rows=%d", DemoAgentsStress.historicalRows)
+                    Task { @MainActor in
+                        guard let self else { return }
+                        self.dataVersion += 1
+                        self.refreshAlertCount()
+                        let probe = DemoAgentsMainQueueProbe()
+                        probe.start()
+                        self.demoAgentsProbe = probe
+                    }
+                } catch {
+                    NSLog("AGENTS_STRESS_SEED_FAILED %@", String(describing: error))
+                    throw error
+                }
+            }
+        } else if DemoData.shouldSeedBulkHistory {
             db.async { [weak self] db in
                 try DemoData.seed(db)
                 Task { @MainActor in self?.dataVersion += 1; self?.refreshAlertCount() }

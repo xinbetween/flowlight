@@ -1,3 +1,4 @@
+import Observation
 import XCTest
 @testable import Flowlight
 
@@ -23,6 +24,23 @@ final class AlertTriageTests: XCTestCase {
                      allowPattern: String = "") throws -> AlertRecord {
         try db.addAlert(kind: "New destination", bundleID: app, appName: app, detail: "detail", severity: 2,
                         at: Date(timeIntervalSince1970: at), allowPattern: allowPattern)
+    }
+
+    @MainActor
+    func testAlertBadgePublishesOnlyChangedCounts() {
+        let badge = TrafficAlertBadge()
+        let changed = XCTestExpectation(description: "Alert sidebar and menu observe a changed count")
+        let initial = withObservationTracking { badge.count } onChange: { changed.fulfill() }
+        XCTAssertEqual(initial, 0)
+        badge.publish(1)
+        XCTAssertEqual(badge.count, 1)
+        wait(for: [changed], timeout: 0.1)
+
+        let duplicate = XCTestExpectation(description: "An unchanged count does not redraw the badge")
+        duplicate.isInverted = true
+        _ = withObservationTracking { badge.count } onChange: { duplicate.fulfill() }
+        badge.publish(1)
+        wait(for: [duplicate], timeout: 0.01)
     }
 
     func testRuleSelectionClearsWhenTheNewStatusHasNoMatchingKind() throws {

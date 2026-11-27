@@ -1,5 +1,14 @@
 import SwiftUI
 
+private struct AlertsSidebarLabel: View {
+    let badge: TrafficAlertBadge
+
+    var body: some View {
+        Label(SidebarItem.alerts.title, systemImage: SidebarItem.alerts.icon)
+            .badge(badge.count)
+    }
+}
+
 struct ContentView: View {
     @ObservedObject private var localization = Localization.shared
     @ObservedObject var rulePacks: RulePackStore
@@ -30,9 +39,14 @@ struct ContentView: View {
                 ForEach(SidebarSection.allCases) { section in
                     Section(section.title) {
                         ForEach(section.items) { item in
-                            Label(item.title, systemImage: item.icon)
-                                .badge(badge(for: item))
-                                .tag(item)
+                            if item == .alerts {
+                                AlertsSidebarLabel(badge: monitor.alertBadge)
+                                    .tag(item)
+                            } else {
+                                Label(item.title, systemImage: item.icon)
+                                    .badge(item == .rules ? rulePacks.pendingReviewCount : 0)
+                                    .tag(item)
+                            }
                         }
                     }
                 }
@@ -144,14 +158,6 @@ struct ContentView: View {
             Button(L("OK")) { monitor.lastError = nil }
         } message: {
             Text(monitor.lastError ?? "")
-        }
-    }
-
-    private func badge(for item: SidebarItem) -> Int {
-        switch item {
-        case .alerts: return monitor.unacknowledgedAlerts
-        case .rules: return rulePacks.pendingReviewCount
-        default: return 0
         }
     }
 

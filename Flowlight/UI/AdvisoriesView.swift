@@ -5,6 +5,7 @@ import SwiftUI
 struct AdvisoriesView: View {
     @ObservedObject var store: AdvisoryStore
     @ObservedObject var updater: AdvisoryCatalogUpdater
+    @EnvironmentObject private var nav: AppNavigation
     @State private var artifacts: [AdvisoryArtifact] = []
     @State private var sources: [AdvisoryInventorySourceResult] = []
     @State private var scanComplete = false
@@ -14,6 +15,8 @@ struct AdvisoriesView: View {
     @State private var probeTotal = 0
     @State private var probeSummary: String?
     @State private var probeStatuses: [String: ExecutableVersionProbe.Status] = [:]
+    @State private var selectedProjectFolderCount = 0
+    @State private var homeScanEnabled = AdvisoryInventoryPreferences.homeScanEnabled
     @State private var refreshID = 0
     @State private var probeRunID: UUID?
     @State private var selectedArtifactID: String?
@@ -28,7 +31,7 @@ struct AdvisoriesView: View {
             switch self {
             case .all: return L("All")
             case .affected: return L("Affected")
-            case .unknown: return L("Unknown or unassessed")
+            case .unknown: return L("Needs review")
             }
         }
     }
@@ -83,6 +86,22 @@ struct AdvisoriesView: View {
     }
 
     var body: some View {
+        Group {
+            switch nav.advisoriesTab {
+            case .agent:
+                AgentAdvisoriesView()
+            case .software:
+                softwareContent
+            }
+        }
+        .navigationTitle(nav.advisoriesTab == .agent ? L("Agent advisories") : L("Software advisories"))
+        .navigationSubtitle(nav.advisoriesTab == .agent
+                            ? L("Local agent metadata · bounded, no execution")
+                            : navigationSubtitle)
+        .toolbar { toolbar }
+    }
+
+    private var softwareContent: some View {
         GeometryReader { geometry in
             Group {
                 if scanning && artifacts.isEmpty {
@@ -95,9 +114,6 @@ struct AdvisoriesView: View {
             }
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
         }
-        .navigationTitle(L("Software advisories"))
-        .navigationSubtitle(navigationSubtitle)
-        .toolbar { toolbar }
         .task(id: refreshID) { await scan() }
         .task(id: probeRunID) {
             guard let probeRunID else { return }
@@ -126,26 +142,49 @@ struct AdvisoriesView: View {
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
-        ToolbarItemGroup {
-            Button { refreshID += 1 } label: {
-                Label(L("Rescan software"), systemImage: "arrow.clockwise")
+        ToolbarItem(placement: .principal) {
+            Picker(L("Advisories"), selection: $nav.advisoriesTab) {
+                ForEach(AdvisoriesTab.allCases) { tab in
+                    Text(tab.title).tag(tab)
+                }
             }
-            .disabled(scanning || probingVersions)
-            .accessibilityIdentifier("advisories.rescan")
-            .help(L("Rescan accessible local software and selected project folders"))
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("advisories.tabs")
+        }
+        if nav.advisoriesTab == .software {
+            ToolbarItemGroup {
+                Button { refreshID += 1 } label: {
+                    Label(L("Rescan software"), systemImage: "arrow.clockwise")
+                }
+                .disabled(scanning || probingVersions)
+                .accessibilityIdentifier("advisories.rescan")
+                .help(L("Rescan accessible local software and selected project folders"))
 
-            Button { Task { await updater.checkNow() } } label: {
-                Label(L("Refresh catalog"), systemImage: "arrow.triangle.2.circlepath")
+                Button { addProjectFolder() } label: {
+                    Label(L("Add project folder…"), systemImage: "folder.badge.plus")
+                }
+                .disabled(scanning || probingVersions)
+                .accessibilityIdentifier("advisories.add-project-folder")
+                .help(L("Choose a project folder to inspect bounded package metadata"))
+
+                Button { Task { await updater.checkNow() } } label: {
+                    Label(L("Refresh catalog"), systemImage: "arrow.triangle.2.circlepath")
+                }
+                .disabled(updater.status == .checking)
+                .accessibilityIdentifier("advisories.refresh-catalog")
+                .help(L("Check for a newer signed advisory catalog without uploading inventory"))
             }
-            .disabled(updater.status == .checking)
-            .accessibilityIdentifier("advisories.refresh-catalog")
-            .help(L("Check for a newer signed advisory catalog without uploading inventory"))
         }
     }
 
     private func content(height: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: Spacing.m) {
             catalogContext
+            homeScanScope
+            inventorySources
+            if artifacts.allSatisfy({ !$0.kind.isPackage }) {
+                projectFolderGuidance
+            }
             versionProbeCard
             summary
             HStack(spacing: Spacing.s) {
@@ -170,12 +209,15 @@ struct AdvisoriesView: View {
 
             if !scanComplete || sources.contains(where: { !$0.complete }) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Label(L("This inventory may be incomplete. Only bounded, accessible sources are shown; no home-directory crawl is performed."),
+                    Label(L("This inventory may be incomplete. Only bounded, accessible sources are shown."),
                           systemImage: "exclamationmark.triangle")
-                    if !sources.filter({ !$0.complete }).isEmpty {
-                        Text(L("Limited sources: %@", sources.filter { !$0.complete }.map(\.source).joined(separator: ", ")))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    ForEach(sources.filter { !$0.complete }, id: \.source) { source in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L("Limited source: %@", source.source))
+                            if let detail = source.detail { Text(detail) }
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                 }
                 .font(.callout)
@@ -242,6 +284,105 @@ struct AdvisoriesView: View {
         .accessibilityIdentifier("advisories.version-probe")
     }
 
+    private var inventorySources: some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Text(L("Inventory sources"))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            ForEach(sources, id: \.source) { source in
+                HStack(spacing: Spacing.s) {
+                    Image(systemName: source.complete ? "checkmark.circle" : "exclamationmark.triangle")
+                        .foregroundStyle(source.complete ? FL.good : FL.warning)
+                    Text(source.source)
+                        .lineLimit(1)
+                    Spacer(minLength: Spacing.s)
+                    Text(L("%lld found", source.discovered))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(source.complete ? L("Complete") : L("Limited"))
+                        .font(.caption)
+                        .foregroundStyle(source.complete ? FL.good : FL.warning)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("advisories.source.\(source.source)")
+            }
+        }
+        .padding(.horizontal, Spacing.m)
+        .padding(.vertical, Spacing.s)
+        .flCard(radius: Radius.chip)
+        .accessibilityIdentifier("advisories.sources")
+    }
+
+    private var homeScanScope: some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.s) {
+                Label(L("Home folder scan"), systemImage: "house.fill")
+                    .font(.callout.weight(.medium))
+                Spacer(minLength: Spacing.s)
+                Toggle(L("Scan home folder recursively"), isOn: $homeScanEnabled)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .accessibilityLabel(homeScanEnabled ? L("Pause home folder scanning") : L("Scan home folder recursively"))
+                    .accessibilityIdentifier("advisories.home-scan.toggle")
+                    .onChange(of: homeScanEnabled) { _, enabled in
+                        AdvisoryInventoryPreferences.setHomeScanEnabled(enabled)
+                        refreshID += 1
+                    }
+            }
+            Text(homeScanEnabled
+                 ? L("Flowlight reads package metadata locally with bounded depth and directory limits. It skips system, generated, hidden, and cache folders and never executes project code.")
+                 : L("Home folder scan is paused. Re-enable it to inspect package metadata under your home folder."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let source = sources.first(where: { $0.source == L("Home folder") }), let detail = source.detail {
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(source.complete ? .secondary : FL.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(Spacing.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .flCard(radius: Radius.chip)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("advisories.home-scan.scope")
+    }
+
+    private var projectFolderGuidance: some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            Label(L("Inspect project packages"), systemImage: "shippingbox.fill")
+                .font(.callout.weight(.medium))
+            Text(L("Node packages and lockfiles are read locally under your home folder and any project folders you choose. Flowlight skips system, generated, and cache folders and never executes project code."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if selectedProjectFolderCount == 0 {
+                Text(L("No project folder selected yet."))
+                    .font(.caption)
+                    .foregroundStyle(FL.warning)
+            } else {
+                Text(L("Selected project folders: %lld", selectedProjectFolderCount))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: Spacing.s) {
+                Button(L("Add project folder…")) { addProjectFolder() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(scanning || probingVersions)
+                    .accessibilityIdentifier("advisories.add-project-folder.guidance")
+                Button(L("Rescan software")) { refreshID += 1 }
+                    .buttonStyle(.bordered)
+                    .disabled(scanning || probingVersions)
+                    .accessibilityIdentifier("advisories.guidance.rescan")
+            }
+        }
+        .padding(Spacing.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .flCard(radius: Radius.chip)
+        .accessibilityIdentifier("advisories.project-folder-guidance")
+    }
+
     private var catalogContext: some View {
         FLContextRow(
             title: catalogTitle,
@@ -305,17 +446,28 @@ struct AdvisoriesView: View {
     }
 
     private var empty: some View {
-        ContentUnavailableView {
-            Label(L("No software found"), systemImage: "square.stack.3d.up")
-        } description: {
-            Text(scanComplete
-                 ? L("No accessible software was found in standard locations or selected project folders.")
-                 : L("The local software inventory is incomplete or unavailable."))
-        } actions: {
-            Button(L("Scan again")) { refreshID += 1 }
-                .accessibilityIdentifier("advisories.empty.rescan")
+        VStack(spacing: Spacing.m) {
+            homeScanScope
+            ContentUnavailableView {
+                Label(L("No software found"), systemImage: "square.stack.3d.up")
+            } description: {
+                Text(scanComplete
+                     ? (selectedProjectFolderCount == 0
+                        ? L("No accessible software was found. Home folder scanning is bounded and can be paused above; choose a project folder for an additional focused scan, or scan again.")
+                        : L("No accessible software was found in standard locations, the home folder, or selected project folders."))
+                     : L("The local software inventory is incomplete or unavailable."))
+            } actions: {
+                VStack(spacing: Spacing.s) {
+                    Button(L("Scan again")) { refreshID += 1 }
+                        .accessibilityIdentifier("advisories.empty.rescan")
+                    Button(L("Add project folder…")) { addProjectFolder() }
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("advisories.empty.add-project-folder")
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
         .accessibilityIdentifier("advisories.empty")
     }
 
@@ -380,7 +532,12 @@ struct AdvisoriesView: View {
             if let probeStatus = row.probeStatus {
                 return probeStatusTitle(probeStatus)
             }
-            return L("Version unknown")
+            if row.artifact.kind == .executable {
+                return ExecutableVersionProbe.isEligible(row.artifact)
+                    ? L("Version check available")
+                    : L("No authoritative version")
+            }
+            return L("No version evidence")
         }
         if let build = row.artifact.buildVersion, build != version {
             return L("Version %@ · build %@ · %@", version, build, versionEvidenceTitle(for: row.artifact))
@@ -407,6 +564,7 @@ struct AdvisoriesView: View {
         case .homebrewInstallReceipt: return L("Homebrew receipt")
         case .packageJSON: return L("package.json")
         case .packageMetadata: return L("Package metadata")
+        case .executableMetadata: return L("Executable metadata")
         case .executableVersionProbe: return L("Executable version output")
         case nil: return L("path only")
         }
@@ -417,7 +575,15 @@ struct AdvisoriesView: View {
         if row.isAffected { return L("Affected") }
         if row.isUnknown {
             if let probeStatus = row.probeStatus { return probeStatusTitle(probeStatus) }
-            return L("Unknown version")
+            if row.artifact.kind == .executable {
+                return ExecutableVersionProbe.isEligible(row.artifact)
+                    ? L("Version check available")
+                    : L("No authoritative version")
+            }
+            if row.artifact.hasRecordedVersionEvidence {
+                return L("Version recorded; comparison unavailable")
+            }
+            return L("Not assessed for version")
         }
         return L("No matching advisory")
     }
@@ -434,16 +600,36 @@ struct AdvisoriesView: View {
 
     private func scan() async {
         scanning = true
-        defer { scanning = false }
+        probeRunID = nil
+        selectedProjectFolderCount = AdvisoryInventoryPreferences.selectedProjectRoots.count
         let result = await Task.detached(priority: .utility) {
             AdvisoryInventoryScanner().scan()
         }.value
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled else {
+            scanning = false
+            return
+        }
         artifacts = result.artifacts
         sources = result.sources
         scanComplete = result.complete
         probeStatuses = [:]
         probeSummary = nil
+        scanning = false
+    }
+
+    @MainActor
+    private func addProjectFolder() {
+        guard let root = AdvisoryProjectFolderPicker.choose() else { return }
+        var roots = AdvisoryInventoryPreferences.selectedProjectRoots
+        guard !roots.contains(where: { $0.id == root.id }) else {
+            selectedProjectFolderCount = roots.count
+            return
+        }
+        roots.append(root)
+        roots.sort { $0.path.localizedCaseInsensitiveCompare($1.path) == .orderedAscending }
+        AdvisoryInventoryPreferences.saveSelectedProjectRoots(roots)
+        selectedProjectFolderCount = roots.count
+        refreshID += 1
     }
 
     private func identifyVersions(runID: UUID) async {
@@ -479,7 +665,7 @@ struct AdvisoriesView: View {
             probeProgress = attempted
         }
         if Task.isCancelled || attempted < candidates.count {
-            probeSummary = L("Identified %lld of %lld executable versions; some remain unknown.", found, candidates.count)
+            probeSummary = L("Identified %lld of %lld executable versions; some remain unavailable.", found, candidates.count)
         } else {
             probeSummary = L("Identified %lld of %lld executable versions.", found, candidates.count)
         }
@@ -546,7 +732,26 @@ private struct AdvisoryDetailView: View {
     }
 
     private var versionText: String {
-        guard let version = row.artifact.version else { return L("Version unknown") }
+        guard let version = row.artifact.version else {
+            if let probeStatus = row.probeStatus {
+                switch probeStatus {
+                case .found: return L("Version identified")
+                case .notAttempted: return L("Version check not attempted")
+                case .unavailable: return L("Executable unavailable")
+                case .nonZeroExit: return L("Version command failed")
+                case .timedOut: return L("Version check timed out")
+                case .outputLimitExceeded: return L("Version output exceeded the limit")
+                case .cancelled: return L("Version check cancelled")
+                case .invalidOutput: return L("Version output not recognized")
+                }
+            }
+            if row.artifact.kind == .executable {
+                return ExecutableVersionProbe.isEligible(row.artifact)
+                    ? L("Version check available")
+                    : L("No authoritative version")
+            }
+            return L("No version evidence")
+        }
         if let build = row.artifact.buildVersion, build != version { return L("Version %@ · build %@", version, build) }
         return version
     }
@@ -556,13 +761,14 @@ private struct AdvisoryDetailView: View {
         case .homebrewInstallReceipt: return L("Homebrew install receipt")
         case .packageJSON: return L("package.json")
         case .packageMetadata: return L("Package metadata")
+        case .executableMetadata: return L("Executable metadata")
         case .executableVersionProbe: return L("Executable version output")
         case nil: return L("identity/path only")
         }
     }
 }
 
-private struct FLContextRow: View {
+struct FLContextRow: View {
     var title: String
     var details: [String] = []
     var systemImage: String = "scope"

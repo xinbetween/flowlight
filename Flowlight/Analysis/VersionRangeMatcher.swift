@@ -12,6 +12,10 @@ enum VersionRangeMatcher {
             return parse(version) != nil
         case .semver:
             return SemVer.parse(version) != nil
+        case .goModule:
+            return normalizedGoVersion(version) != nil
+        case .pep440:
+            return PEP440.parse(version) != nil
         }
     }
 
@@ -50,6 +54,10 @@ enum VersionRangeMatcher {
         switch artifact.versionScheme {
         case .semver:
             return matchesSemver(version: artifact.version, range: match.versionRange, criteria: match.criteria)
+        case .goModule:
+            return matchesGoModule(version: artifact.version, range: match.versionRange, criteria: match.criteria)
+        case .pep440:
+            return matchesPEP440(version: artifact.version, range: match.versionRange, criteria: match.criteria)
         case .numeric, .opaque:
             guard let version = parse(artifact.version), matches(version: artifact.version, range: match.versionRange) else {
                 return false
@@ -110,6 +118,126 @@ enum VersionRangeMatcher {
         }
         if lhs.prerelease.count == rhs.prerelease.count { return .orderedSame }
         return lhs.prerelease.count < rhs.prerelease.count ? .orderedAscending : .orderedDescending
+    }
+
+    private static func normalizedGoVersion(_ value: String?) -> String? {
+        guard var value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
+        if value.hasPrefix("v") { value.removeFirst() }
+        if value.hasSuffix("+incompatible") { value.removeLast("+incompatible".count) }
+        guard SemVer.parse(value) != nil else { return nil }
+        let releaseAndPrerelease = value.split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
+        if releaseAndPrerelease.count == 2 {
+            let identifiers = releaseAndPrerelease[1].split(separator: "-", omittingEmptySubsequences: false).map(String.init)
+            if identifiers.first?.allSatisfy(\.isNumber) == true {
+                let isTimestampOnly = identifiers.count == 2 && identifiers[0].count == 14 && identifiers[1].count == 12
+                let isBasePseudo = identifiers.count == 3 && identifiers[0] == "0" && identifiers[1].count == 14 && identifiers[2].count == 12
+                guard isTimestampOnly || isBasePseudo else { return nil }
+            }
+        }
+        return value
+    }
+
+    private static func matchesGoModule(version: String?, range: AdvisoryVersionRange, criteria: String) -> Bool {
+        guard let version = normalizedGoVersion(version), let parsed = SemVer.parse(version) else { return false }
+        func bound(_ value: String?) -> SemVer? {
+            guard let normalized = normalizedGoVersion(value) else { return value == nil ? nil : nil }
+            return SemVer.parse(normalized)
+        }
+        if let start = bound(range.startIncluding), compare(parsed, start) == .orderedAscending { return false }
+        if range.startIncluding != nil && bound(range.startIncluding) == nil { return false }
+        if let start = bound(range.startExcluding), compare(parsed, start) != .orderedDescending { return false }
+        if range.startExcluding != nil && bound(range.startExcluding) == nil { return false }
+        if let end = bound(range.endIncluding), compare(parsed, end) == .orderedDescending { return false }
+        if range.endIncluding != nil && bound(range.endIncluding) == nil { return false }
+        if let end = bound(range.endExcluding), compare(parsed, end) != .orderedAscending { return false }
+        if range.endExcluding != nil && bound(range.endExcluding) == nil { return false }
+        if let criteria = criteriaVersionString(criteria), let normalized = normalizedGoVersion(criteria) {
+            return compare(parsed, SemVer.parse(normalized)!) == .orderedSame
+        }
+        return criteriaHasWildcardVersion(criteria)
+    }
+
+    private struct PEP440: Equatable {
+        var epoch: UInt64
+        var release: [UInt64]
+        var preRank: Int?
+        var preNumber: UInt64
+        var devNumber: UInt64?
+        var postNumber: UInt64?
+
+        static func parse(_ value: String?) -> PEP440? {
+            guard let value else { return nil }
+            let pattern = #"^\s*(?:(\d+)!)?(\d+(?:[._-]\d+)*)(?:[._-]?(a|alpha|b|beta|c|rc|pre|preview)(\d*))?(?:[._-]?(post|rev|r)(\d*))?(?:[._-]?dev(\d*))?(?:\+([A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*))?\s*$"#
+            guard let expression = try? NSRegularExpression(pattern: pattern),
+                  let match = expression.firstMatch(in: value, range: NSRange(value.startIndex..<value.endIndex, in: value)) else { return nil }
+            func capture(_ index: Int) -> String? {
+                guard let range = Range(match.range(at: index), in: value) else { return nil }
+                return String(value[range])
+            }
+            guard let releaseText = capture(2) else { return nil }
+            let release = releaseText.replacingOccurrences(of: "_", with: ".").replacingOccurrences(of: "-", with: ".")
+                .split(separator: ".").compactMap { UInt64($0) }
+            guard release.count == releaseText.split(whereSeparator: { $0 == "." || $0 == "_" || $0 == "-" }).count else { return nil }
+            let epoch = UInt64(capture(1) ?? "0") ?? 0
+            let preRank: Int? = {
+                switch capture(3)?.lowercased() {
+                case "a", "alpha": return 0
+                case "b", "beta": return 1
+                case "c", "rc", "pre", "preview": return 2
+                default: return nil
+                }
+            }()
+            let preNumber = UInt64(capture(4) ?? "0") ?? 0
+            let postNumber = capture(5).map { _ in UInt64(capture(6) ?? "0") ?? 0 }
+            let devNumber = capture(7).map { UInt64($0.isEmpty ? "0" : $0) ?? 0 }
+            return PEP440(epoch: epoch, release: release, preRank: preRank, preNumber: preNumber,
+                          devNumber: devNumber, postNumber: postNumber)
+        }
+    }
+
+    private static func compare(_ lhs: PEP440, _ rhs: PEP440) -> ComparisonResult {
+        if lhs.epoch != rhs.epoch { return lhs.epoch < rhs.epoch ? .orderedAscending : .orderedDescending }
+        let count = max(lhs.release.count, rhs.release.count)
+        for index in 0..<count {
+            let left = index < lhs.release.count ? lhs.release[index] : 0
+            let right = index < rhs.release.count ? rhs.release[index] : 0
+            if left != right { return left < right ? .orderedAscending : .orderedDescending }
+        }
+        func stage(_ version: PEP440) -> Int {
+            if version.preRank != nil { return version.preRank! }
+            if version.devNumber != nil { return -1 }
+            return 3
+        }
+        if stage(lhs) != stage(rhs) { return stage(lhs) < stage(rhs) ? .orderedAscending : .orderedDescending }
+        if lhs.preRank != nil {
+            if lhs.preNumber != rhs.preNumber { return lhs.preNumber < rhs.preNumber ? .orderedAscending : .orderedDescending }
+        }
+        if lhs.devNumber != nil || rhs.devNumber != nil {
+            if lhs.devNumber == nil { return .orderedDescending }
+            if rhs.devNumber == nil { return .orderedAscending }
+            if lhs.devNumber! != rhs.devNumber! { return lhs.devNumber! < rhs.devNumber! ? .orderedAscending : .orderedDescending }
+        }
+        if lhs.postNumber == nil && rhs.postNumber != nil { return .orderedAscending }
+        if lhs.postNumber != nil && rhs.postNumber == nil { return .orderedDescending }
+        if lhs.postNumber != rhs.postNumber {
+            return (lhs.postNumber ?? 0) < (rhs.postNumber ?? 0) ? .orderedAscending : .orderedDescending
+        }
+        return .orderedSame
+    }
+
+    private static func matchesPEP440(version: String?, range: AdvisoryVersionRange, criteria: String) -> Bool {
+        guard let version = PEP440.parse(version) else { return false }
+        func bound(_ value: String?) -> PEP440? { value == nil ? nil : PEP440.parse(value) }
+        if let start = bound(range.startIncluding), compare(version, start) == .orderedAscending { return false }
+        if range.startIncluding != nil && bound(range.startIncluding) == nil { return false }
+        if let start = bound(range.startExcluding), compare(version, start) != .orderedDescending { return false }
+        if range.startExcluding != nil && bound(range.startExcluding) == nil { return false }
+        if let end = bound(range.endIncluding), compare(version, end) == .orderedDescending { return false }
+        if range.endIncluding != nil && bound(range.endIncluding) == nil { return false }
+        if let end = bound(range.endExcluding), compare(version, end) != .orderedAscending { return false }
+        if range.endExcluding != nil && bound(range.endExcluding) == nil { return false }
+        if let criteria = criteriaVersionString(criteria), let exact = PEP440.parse(criteria) { return compare(version, exact) == .orderedSame }
+        return criteriaHasWildcardVersion(criteria)
     }
 
     private static func matchesSemver(version: String?, range: AdvisoryVersionRange, criteria: String) -> Bool {

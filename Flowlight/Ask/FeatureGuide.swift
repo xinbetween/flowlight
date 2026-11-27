@@ -212,7 +212,7 @@ extension FeatureGuide {
 
         FeatureGuide(
             id: "advisories", title: "Software advisories",
-            summary: "Matches typed local software identities and verified versions against a signed local CVE catalog. Matching stays on this Mac; an incomplete inventory or unknown version is shown as not assessed, never as safe.",
+            summary: "Matches typed local software identities and verified versions against a signed local CVE catalog. Matching stays on this Mac; an incomplete inventory or unavailable version is shown as not assessed, never as safe.",
             steps: ["Open Advisories.", "Rescan bounded software sources, then select an artifact to review its identity, version evidence and any confirmed CVE matches.", "Use Settings to choose project folders for node_modules; use Refresh catalog only when you explicitly want to check the fixed Flowlight advisory origin."],
             screen: .advisories,
             caveats: ["The App Store build may not be able to enumerate every source without explicit folder access.", "Advisories do not block traffic or change policies. A stale or unavailable catalog cannot produce a confirmed match."],

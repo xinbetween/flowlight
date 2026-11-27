@@ -70,6 +70,12 @@ enum AgentGatewayConfigReader {
         ]),
     ]
 
+    private static let codexPath = ".codex/config.toml"
+
+    static var settingsPaths: [(agent: String, path: String)] {
+        jsonRecipes.map { ($0.agent, $0.path) } + [("codex", codexPath)]
+    }
+
     static func load(home: URL = FileManager.default.homeDirectoryForCurrentUser,
                      fm: FileManager = .default) -> [AgentGatewayConfig] {
         var gateways = jsonRecipes.flatMap { recipe -> [AgentGatewayConfig] in
@@ -77,7 +83,7 @@ enum AgentGatewayConfigReader {
             guard let data = fm.contents(atPath: url.path) else { return [] }
             return parseJSON(data, agent: recipe.agent, source: source(url, home: home), keys: recipe.keys)
         }
-        let codex = home.appendingPathComponent(".codex/config.toml")
+        let codex = home.appendingPathComponent(codexPath)
         if let data = fm.contents(atPath: codex.path) {
             gateways += parseCodexTOML(String(decoding: data, as: UTF8.self), source: source(codex, home: home))
         }

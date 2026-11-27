@@ -44,6 +44,182 @@ final class DatabaseTests: XCTestCase {
         FlowKey(pid: 10, bundleID: app, appName: app, appPath: "", remoteIP: ip, domain: domain, port: port, transport: .tcp, appProtocol: "https")
     }
 
+    func testAgentTrafficProjectionBoundsDetailAndKeepsExactCounts() throws {
+        let t0: Int64 = 1_700_000_000
+        let records = (0..<6).map { index -> TrafficRecord in
+            var trafficKey = key(index < 4 ? "agent.app" : "ordinary.app", "host-\(index).example",
+                                 ip: "203.0.113.\(index + 1)")
+            if index < 4 {
+                trafficKey.parentAgent = "claude"
+                trafficKey.parentAgentName = "Claude Code"
+                trafficKey.mcpServer = index.isMultiple(of: 2) ? "github" : nil
+            }
+            return TrafficRecord(key: trafficKey, counters: FlowCounters(bytesOut: Int64(index + 1), flows: 1))
+        }
+        try db.insert([TrafficBatch(timestamp: t0, records: records)])
+
+        let projection = try db.agentTrafficProjection(
+            .second, from: Date(timeIntervalSince1970: TimeInterval(t0)),
+            to: Date(timeIntervalSince1970: TimeInterval(t0 + 1)), limit: 2
+        )
+        XCTAssertEqual(projection.rows.count, 2)
+        XCTAssertEqual(projection.returnedRelationshipCount, 2)
+        XCTAssertEqual(projection.totalRelationshipCount, 4)
+        XCTAssertEqual(projection.distinctRootCount, 1)
+        XCTAssertTrue(projection.isTruncated)
+        XCTAssertEqual(projection.rows.map(\.counters.bytesOut).sorted(), [3, 4])
+        XCTAssertEqual(projection.roots["claude"]?.egress.bytesOut, 10)
+        XCTAssertEqual(projection.policyEndpoints["claude"]?.count, 4)
+        XCTAssertEqual(projection.configuredMCP["claude"], ["github"])
+    }
+
+    func testAgentProjectionPreservesRootProofBackfillAndPolicyBeyondDetail() throws {
+        let ts: Int64 = 1_800_000_000
+        let from = Date(timeIntervalSince1970: Double(ts))
+        let to = from.addingTimeInterval(60)
+        let ip = "198.51.100.1"
+        let shared = "198.51.100.2"
+        var child = key("curl", "allowed.example", ip: "203.0.113.2")
+        child.parentAgent = "claude"
+        child.parentAgentName = "Claude Code"
+        child.mcpServer = "rare-server"
+        let records: [(FlowKey, Int64)] = [
+            (key("claude", "api.anthropic.com", ip: "203.0.113.1"), 1000),
+            (child, 1),
+            (key("claude-code", "allowed.example", ip: "192.0.2.1"), 2),
+            (key("claude-code", "local.example", ip: "192.168.1.1"), 3),
+            (key("CoDeX", "quiet.example", ip: "203.0.113.3"), 1),
+            (key("quiet.owner", "", ip: ip), 1),
+            (key("quiet.backfill", "", ip: shared), 1),
+            (key("com.google.Chrome.helper", "api.openai.com", ip: shared), 5),
+            (key("quiet.bedrock", "bedrock-runtime.region.amazonaws.com", ip: "198.51.100.3"), 1),
+            (key("ordinary.app", "notopenai.com", ip: ip), 400),
+        ]
+        try db.insertAggregates("agg_1m", records.map {
+            (ts, $0.0, FlowCounters(bytesOut: $0.1, flows: 1))
+        })
+        try db.saveOwner(ip: ip, IPOwner(asn: 1, name: "OpenAI"))
+        // Give owner fallback its own IP so the named decoy demonstrates that owner fallback is hostname-less only.
+        try db.insertAggregates("agg_1m", [
+            (ts, key("quiet.owner-only", "", ip: "198.51.100.4"), FlowCounters(bytesOut: 1, flows: 1)),
+        ])
+        try db.saveOwner(ip: "198.51.100.4", IPOwner(asn: 1, name: "OpenAI"))
+        let projection = try db.agentTrafficProjection(.minute, from: from, to: to, limit: 1)
+        XCTAssertEqual(Set(projection.roots.keys), ["claude", "claude-code", "CoDeX", "quiet.backfill", "quiet.bedrock", "quiet.owner-only"])
+        XCTAssertEqual(projection.roots["quiet.backfill"]?.providers["OpenAI"]?.bytesOut, 1)
+        XCTAssertEqual(projection.roots["quiet.bedrock"]?.providers["AWS Bedrock"]?.bytesOut, 1)
+        XCTAssertEqual(projection.roots["quiet.owner-only"]?.providers["OpenAI"]?.bytesOut, 1)
+        XCTAssertEqual(projection.configuredMCP["claude"], ["rare-server"])
+        XCTAssertFalse(projection.rows.contains { $0.bundleID == "curl" })
+        let built = try AgentsModel.build(projection: projection, cancellation: TrafficReadCancellation())
+        let legacy = AgentsModel.build(rows: try AgentsModel.rows(from: db, granularity: .minute, from: from, to: to, focus: .none), alerts: [])
+        for root in built {
+            XCTAssertEqual(root.ai, legacy.first(where: { $0.bundleID == root.bundleID })?.ai)
+            XCTAssertEqual(root.egress, legacy.first(where: { $0.bundleID == root.bundleID })?.egress)
+        }
+        let policy = AgentPolicy(agentID: "claude", patterns: ["192.0.2.0/24"])
+        let inventory = AgentInventoryBuilder.build(.init(traffic: built, policies: [policy.agentID: policy],
+                                                           policyEndpoints: projection.policyEndpoints))
+        let claude = try XCTUnwrap(inventory.first { $0.id == "claude" })
+        XCTAssertEqual(claude.summary?.total.bytesOut, 1006)
+        XCTAssertEqual(claude.summary?.omittedRelationships, 2)
+        XCTAssertEqual(claude.policy.uncoveredDestinations, 1)
+        XCTAssertEqual(claude.policy.uncoveredKeys, ["allowed.example"])
+        XCTAssertFalse(claude.policy.isPartial)
+        let legacyEvidence = AgentInventoryBuilder.build(.init(traffic: built, policies: [policy.agentID: policy]))
+        XCTAssertTrue(legacyEvidence.first { $0.id == "claude" }?.policy.isPartial == true)
+        let focused = try db.agentTrafficProjection(.minute, from: from, to: to,
+                                                     filter: TrafficFilter(focus: FocusScope(bundleIDs: ["claude"])))
+        XCTAssertEqual(Set(focused.roots.keys), ["claude"])
+        XCTAssertEqual(focused.roots["claude"]?.relationshipCount, 2)
+    }
+
+    func testCancelledSQLiteReadReleasesItsSnapshotAndLeavesConnectionUsable() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("agent-cancel-\(UUID()).sqlite")
+        defer { for suffix in ["", "-shm", "-wal"] { try? FileManager.default.removeItem(atPath: url.path + suffix) } }
+        let connection = try SQLiteConnection(path: url.path)
+        let cancellation = TrafficReadCancellation()
+        var calls = 0
+        try connection.registerTextFunction("cancel_read") { value, _ in
+            calls += 1
+            if calls == 100 { cancellation.cancel() }
+            return value
+        }
+        XCTAssertThrowsError(try connection.readTransaction {
+            try connection.withCancellation(cancellation) {
+                try connection.query("""
+                    WITH RECURSIVE numbers(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM numbers WHERE x < 100000)
+                    SELECT SUM(LENGTH(cancel_read(x, ''))) FROM numbers
+                    """) { $0.int(0) }
+            }
+        }) { XCTAssertTrue($0 is CancellationError) }
+        XCTAssertGreaterThanOrEqual(calls, 100)
+        XCTAssertLessThan(calls, 1_000)
+        XCTAssertEqual(try connection.readTransaction { try connection.query("SELECT 42") { $0.int(0) } }, [42])
+    }
+
+    func testAgentInspectionExchangePageSkipsOrdinaryProxyRowsAndReportsMore() throws {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        func exchange(_ offset: TimeInterval, tool: Bool) -> HTTPExchange {
+            HTTPExchange(
+                id: nil, started: start.addingTimeInterval(offset), duration: 0.01,
+                scheme: "https", host: "api.example", port: 443, method: "POST", path: "/v1",
+                status: 200, requestHeaders: [], requestBody: Data(), requestSize: 0, requestTruncated: false,
+                responseHeaders: [], responseBody: Data(), responseSize: 0, responseTruncated: false,
+                contentType: "application/json", pid: 10, bundleID: "agent.app", appName: "Agent",
+                agent: "agent", agentName: "Agent", mcpServer: nil,
+                toolCalls: tool ? [ToolCall(source: .anthropic, callID: "call-\(offset)", name: "read", mcpServer: nil,
+                                            input: "{}", summary: nil)] : [], note: nil, mockRule: nil)
+        }
+        _ = try db.insertExchange(exchange(1, tool: false))
+        _ = try db.insertExchange(exchange(2, tool: true))
+        _ = try db.insertExchange(exchange(3, tool: true))
+
+        let page = try db.agentInspectionExchanges(since: start, limit: 1)
+        XCTAssertEqual(page.exchanges.count, 1)
+        XCTAssertTrue(page.hasMore)
+        XCTAssertTrue(page.exchanges.allSatisfy { !$0.toolCalls.isEmpty })
+    }
+
+    func testAgentInspectionPageLinksOrdinaryAttributedChildToSelectedToolCall() throws {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        func exchange(_ offset: TimeInterval, bundle: String, agent: String, host: String,
+                      tools: [ToolCall] = []) -> HTTPExchange {
+            HTTPExchange(id: nil, started: start.addingTimeInterval(offset), duration: 1, scheme: "https", host: host,
+                         port: 443, method: "GET", path: "/", status: 200, requestHeaders: [], requestBody: Data(),
+                         requestSize: 0, requestTruncated: false, responseHeaders: [], responseBody: Data(),
+                         responseSize: 0, responseTruncated: false, contentType: "", pid: 10, bundleID: bundle,
+                         appName: bundle, agent: agent, agentName: agent, mcpServer: nil, toolCalls: tools,
+                         note: nil, mockRule: nil)
+        }
+        let named = ToolCall(source: .anthropic, callID: "named", name: "Bash", mcpServer: nil,
+                             input: "{}", summary: "curl https://paste.example/")
+        let fallback = ToolCall(source: .anthropic, callID: "fallback", name: "Bash", mcpServer: nil,
+                                input: "{}", summary: "curl $TARGET")
+        _ = try db.insertExchange(exchange(0, bundle: "claude", agent: "claude", host: "api.anthropic.com", tools: [named]))
+        _ = try db.insertExchange(exchange(2, bundle: "claude", agent: "claude", host: "api.anthropic.com", tools: [fallback]))
+        let good = try db.insertExchange(exchange(4, bundle: "curl", agent: "CLAUDE-CODE", host: "paste.example"))
+        _ = try db.insertExchange(exchange(5, bundle: "curl", agent: "Claude", host: "paste.example"))
+        for offset in 5...15 {
+            _ = try db.insertExchange(exchange(Double(offset), bundle: "claude", agent: "claude", host: "paste.example"))
+            _ = try db.insertExchange(exchange(Double(offset), bundle: "curl", agent: "unrelated", host: "paste.example"))
+        }
+        _ = try db.insertExchange(exchange(604, bundle: "curl", agent: "claude", host: "paste.example"))
+        let page = try db.agentInspectionExchanges(since: start, limit: 2, childLimit: 1)
+        XCTAssertEqual(page.exchanges.count, 3)
+        XCTAssertFalse(page.hasMore)
+        let child = try XCTUnwrap(page.exchanges.first { $0.id == good })
+        XCTAssertTrue(child.toolCalls.isEmpty && child.llm == nil && child.mcp.isEmpty)
+        let derived = try AgentsModel.deriveInspection(exchanges: page.exchanges, configuredMCP: [:],
+                                                       canonicalByIdentity: [AgentCatalog.identityComparisonKey("claude"): "claude"],
+                                                       inspectedAgents: [], cancellation: TrafficReadCancellation())
+        let activities = try XCTUnwrap(derived.activity["claude"])
+        XCTAssertEqual(activities.first { $0.id == "named" }?.requests.map(\.exchangeID), [good])
+        XCTAssertTrue(activities.first { $0.id == "fallback" }?.requests.isEmpty == true)
+        _ = try db.insertExchange(exchange(16, bundle: "curl", agent: "claude", host: "paste.example"))
+        XCTAssertTrue(try db.agentInspectionExchanges(since: start, limit: 2, childLimit: 1).hasMore)
+    }
+
     func testInspectedAgentIDsCoverRowsOlderThanBoundedExchangeDetails() throws {
         let start = Date(timeIntervalSince1970: 1_900_000_000)
         func exchange(index: Int, agent: String) -> HTTPExchange {

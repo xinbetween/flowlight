@@ -1,6 +1,69 @@
 /* Analysis/AnomalyEngine.swift */
 
+/* Agent advisories */
+"Agent advisories" = "代理安全建议";
+"Software" = "软件";
+"Local agent metadata · bounded, no execution" = "本地代理元数据 · 有界扫描，不执行";
+"Agent security inventory" = "代理安全清单";
+"Scan agent files" = "扫描代理文件";
+"Scan /" = "扫描 /";
+"Scanning accessible agent metadata under /…" = "正在扫描 / 下可访问的代理元数据…";
+"Agent metadata scan complete" = "代理元数据扫描完成";
+"Agent metadata scan is incomplete" = "代理元数据扫描不完整";
+"Private data access" = "私有数据访问";
+"Untrusted content" = "不受信任的内容";
+"External egress" = "外部出站";
+"Agent finding" = "代理发现项";
+"Agent artifact discovered" = "发现代理工件";
+"Credential-like material present" = "存在类似凭据的内容";
+"Agent scan folders" = "代理扫描文件夹";
+"Allow a one-time scan of your home folder?" = "允许一次性扫描主文件夹吗？";
+"Scan home folder" = "扫描主文件夹";
+"Not now" = "暂不";
+"Flowlight will inspect bounded Agent metadata under ~ locally. It will not execute files, upload findings, or enter protected media folders. macOS privacy controls may still make coverage incomplete." = "Flowlight 将在本地检查 ~ 下有限的代理元数据。不会执行文件、上传发现项或进入受保护的媒体文件夹。macOS 隐私控制仍可能导致覆盖不完整。";
+"The home folder is scanned by default. Add folders when agent metadata lives elsewhere; additions apply to the next explicit scan." = "默认扫描主文件夹。如果代理元数据位于其他位置，可以添加文件夹；添加内容将在下一次明确扫描时生效。";
+"Home folder (default)" = "主文件夹（默认）";
+"Scan configured agent folders?" = "要扫描已配置的代理文件夹吗？";
+"Scan configured folders" = "扫描已配置的文件夹";
+"Choose an additional folder for bounded local Agent metadata inspection. The folder is not scanned until you explicitly start an Agent advisory scan." = "选择用于有限本地代理元数据检查的其他文件夹。在你明确启动代理建议扫描之前，不会扫描该文件夹。";
+"Scanning accessible agent metadata in configured folders…" = "正在扫描已配置文件夹中的可访问代理元数据…";
+"Add scan folder…" = "添加扫描文件夹…";
+"Remove scan folder" = "移除扫描文件夹";
+"Remove scan folder %@" = "移除扫描文件夹 %@";
+"Start an explicit bounded scan of your home folder and any additional folders you selected. Hidden agent folders such as .claude and .codex are included; symlinks, generated folders, and unreadable locations are skipped and reported." = "明确且有限地扫描主文件夹和你选择的其他文件夹。包括 .claude 和 .codex 等隐藏代理文件夹；跳过并报告符号链接、生成文件夹和无法读取的位置。";
+
 /* Advisories executable version probing */
+"Home folder" = "主文件夹";
+"Inventory sources" = "清单来源";
+"%lld found" = "发现 %lld 个";
+"Complete" = "完整";
+"Limited" = "受限";
+"Home folder scan" = "主文件夹扫描";
+"Home folder package scanning is paused." = "主文件夹包扫描已暂停。";
+"The home folder could not be read." = "无法读取主文件夹。";
+"Recursive home scan · depth %lld · %lld directories · system, generated, hidden, and cache folders skipped." = "递归扫描主文件夹 · 深度 %lld · %lld 个文件夹 · 跳过隐藏、受保护、构建和缓存文件夹。";
+"Home scan is bounded at depth %lld and %lld directories; system, generated, hidden, and cache folders are skipped." = "主文件夹扫描限制为深度 %lld 和 %lld 个文件夹；跳过受保护、隐藏、构建和缓存文件夹。";
+"Scan home folder recursively" = "递归扫描主文件夹";
+"Pause home folder scanning" = "暂停主文件夹扫描";
+"Flowlight reads package metadata locally with bounded depth and directory limits. It skips system, generated, hidden, and cache folders and never executes project code." = "Flowlight 在本地读取包元数据，并限制深度和文件夹数量。它会跳过受保护、隐藏、构建和缓存文件夹，绝不会执行项目代码。";
+"Home folder scan is paused. Re-enable it to inspect package metadata under your home folder." = "主文件夹扫描已暂停。重新启用后即可检查其中的包元数据。";
+"Node packages and lockfiles are read locally under your home folder and any project folders you choose. Flowlight skips system, generated, and cache folders and never executes project code." = "Node 包和锁文件仅在本地主文件夹及你选择的项目文件夹中读取。Flowlight 会跳过受保护和生成的文件夹，绝不会执行项目代码。";
+"This inventory may be incomplete. Only bounded, accessible sources are shown." = "此清单可能不完整。仅显示在限制范围内可访问的来源。";
+"Limited source: %@" = "受限来源：%@";
+"No accessible software was found. Home folder scanning is bounded and can be paused above; choose a project folder for an additional focused scan, or scan again." = "未找到可访问的软件。主文件夹扫描有边界，可在上方暂停；选择项目文件夹进行额外的定向扫描，或再次扫描。";
+"No accessible software was found in standard locations, the home folder, or selected project folders." = "在标准位置、主文件夹或所选项目文件夹中未找到可访问的软件。";
+"Choose an additional project folder. Flowlight also scans bounded package metadata throughout your home folder, while skipping system, generated, and cache folders." = "选择其他项目文件夹。Flowlight 也会在主文件夹中扫描受限的包元数据，同时跳过受保护和生成的文件夹。";
+"Choose an additional folder for bounded local Agent metadata inspection. The folder is not scanned until you explicitly start an Agent advisory scan." = "选择用于有限本地代理元数据检查的其他文件夹。在你明确启动代理建议扫描之前，不会扫描该文件夹。";
+"None selected. The Advisories page also performs a bounded home-folder package scan." = "尚未选择。公告页面也会执行受限的主文件夹包扫描。";
+"Choose an additional bounded project folder; home-folder scanning is controlled on Advisories" = "选择其他受限项目文件夹；主文件夹扫描在公告页面控制";
+"Matching is local and advisory-only. Standard application, executable, Homebrew, and home-folder package locations are bounded; system, generated, and cache folders are skipped. Clearing this data removes the cached catalog and its local matches." = "匹配仅在本地进行，仅用于提示。应用、可执行文件、Homebrew 和主文件夹包的位置均受限；跳过受保护和生成的文件夹。清除数据会删除缓存目录和本地匹配结果。";
+"Inspect project packages" = "检查项目包";
+"Node packages and lockfiles are read only inside folders you choose. Flowlight never crawls your whole home folder." = "Node 包和锁定文件只会在你选择的文件夹中读取。Flowlight 不会扫描整个主文件夹。";
+"No project folder selected yet." = "尚未选择项目文件夹。";
+"Selected project folders: %lld" = "已选择的项目文件夹：%lld";
+"No accessible software was found. Choose a project folder to inspect bounded package metadata, or scan again." = "未找到可访问的软件。请选择项目文件夹以检查有限的包元数据，或再次扫描。";
+"Choose a project folder. Flowlight reads bounded package metadata inside it; it never crawls your whole home folder." = "请选择项目文件夹。Flowlight 只读取其中有限的包元数据，不会扫描整个主文件夹。";
+"Choose a project folder to inspect bounded package metadata" = "选择项目文件夹以检查有限的包元数据";
 "Identify executable versions" = "识别可执行文件版本";
 "Runs bounded local version checks for supported executables; inventory never leaves this Mac." = "对支持的可执行文件进行有界本地版本检查；软件清单不会离开此 Mac。";
 "Stop" = "停止";
@@ -8,11 +71,19 @@
 "Checked %lld of %lld supported executables" = "已检查 %lld/%lld 个支持的可执行文件";
 "%lld supported executable%@ found. Version checks are explicit and time-limited." = "找到 %lld 个支持的可执行文件。版本检查需要明确启动并受时间限制。";
 "No supported executable versions were found to identify." = "未找到可识别的支持可执行文件版本。";
-"Identified %lld of %lld executable versions; some remain unknown." = "已识别 %lld/%lld 个可执行文件版本；部分版本仍未知。";
+"Identified %lld of %lld executable versions; some remain unavailable." = "已识别 %lld/%lld 个可执行文件版本；部分版本仍不可用。";
 "Identified %lld of %lld executable versions." = "已识别 %lld/%lld 个可执行文件版本。";
 "Executable version output" = "可执行文件版本输出";
 "Packages" = "软件包";
 "Version identified" = "已识别版本";
+"Executable metadata" = "可执行文件元数据";
+"Needs review" = "需要检查";
+"Version check available" = "可检查版本";
+"Version not checked" = "未检查版本";
+"No authoritative version" = "没有可靠版本";
+"Version recorded; comparison unavailable" = "已记录版本；无法比较";
+"No version evidence" = "没有版本证据";
+"Not assessed for version" = "未评估版本";
 "Version check not attempted" = "尚未尝试版本检查";
 "Executable unavailable" = "可执行文件不可用";
 "Version command failed" = "版本命令失败";
@@ -2149,3 +2220,33 @@
 "Review new alerts in Flowlight" = "在 Flowlight 中查看新提醒";
 "Runtime" = "运行时";
 "The selected pack is configured but is not blocking until the Network Extension and inspection matcher both acknowledge the exact desired digest." = "所选包已配置，但在网络扩展和检查匹配器均确认完全一致的目标摘要之前不会执行阻止。";
+
+/* Agent advisory analysis */
+"Advisory analysis" = "安全建议分析";
+"Allow home folder scans?" = "允许扫描个人文件夹吗？";
+"Allow scans" = "允许扫描";
+"Apple on-device model" = "Apple 设备端模型";
+"Inventory only" = "仅生成清单";
+"This Mac can't run the on-device model." = "此 Mac 无法运行设备端模型。";
+"With your consent, Flowlight scans your home folder and any folders you add." = "获得同意后，Flowlight 会扫描个人文件夹和你添加的文件夹。";
+"Reviewing scan evidence on this Mac…" = "正在此 Mac 上分析扫描证据…";
+"No evidence available for model analysis." = "没有可供模型分析的证据。";
+"The inventory is available below." = "可在下方查看清单。";
+"Evidence: %@" = "证据：%@";
+"Artifact" = "文件资料";
+"Provenance" = "来源";
+"Supported settings inspected: %lld of %lld found" = "已检查的受支持设置：%lld 项，共找到 %lld 项";
+"Findings hidden by the display limit: %lld" = "因显示上限而隐藏的发现：%lld 项";
+"Choose an additional folder for local agent settings scans." = "请选择一个额外文件夹，用于在本机扫描智能体设置。";
+
+/* AI Agents activity coverage */
+"Loading agent activity…" = "正在加载智能体活动…";
+"Refreshing agent activity…" = "正在刷新智能体活动…";
+"Could not load agent activity." = "无法加载智能体活动。";
+"Showing %lld of %lld agent traffic relationships. Traffic totals are complete." = "显示 %lld 条智能体流量关系，共 %lld 条。流量总计包含全部关系。";
+"Inspection detail is partial for this window." = "此时间范围仅显示部分检查详情。";
+"%lld traffic relationships omitted for this agent. Destination and tool detail is partial." = "已省略此智能体的 %lld 条流量关系。仅显示部分目标和工具详情。";
+"Destination policy coverage is partial." = "仅验证了部分目标的策略覆盖情况。";
+"Showing %lld of %lld destinations." = "显示 %lld 个目标，共 %lld 个。";
+"Showing %lld of %lld tool calls." = "显示 %lld 次工具调用，共 %lld 次。";
+"Partial" = "部分";

@@ -1,6 +1,69 @@
 /* Analysis/AnomalyEngine.swift */
 
+/* Agent advisories */
+"Agent advisories" = "Avisos de agentes";
+"Software" = "Software";
+"Local agent metadata · bounded, no execution" = "Metadatos locales de agentes · acotado, sin ejecución";
+"Agent security inventory" = "Inventario de seguridad de agentes";
+"Scan agent files" = "Analizar archivos de agentes";
+"Scan /" = "Analizar /";
+"Scanning accessible agent metadata under /…" = "Analizando metadatos accesibles de agentes en /…";
+"Agent metadata scan complete" = "Análisis de metadatos de agentes completado";
+"Agent metadata scan is incomplete" = "El análisis de metadatos de agentes está incompleto";
+"Private data access" = "Acceso a datos privados";
+"Untrusted content" = "Contenido no confiable";
+"External egress" = "Salida externa";
+"Agent finding" = "Hallazgo de agente";
+"Agent artifact discovered" = "Artefacto de agente descubierto";
+"Credential-like material present" = "Hay material similar a credenciales";
+"Agent scan folders" = "Carpetas de análisis de agentes";
+"Allow a one-time scan of your home folder?" = "¿Permitir un análisis único de tu carpeta de inicio?";
+"Scan home folder" = "Analizar carpeta de inicio";
+"Not now" = "Ahora no";
+"Flowlight will inspect bounded Agent metadata under ~ locally. It will not execute files, upload findings, or enter protected media folders. macOS privacy controls may still make coverage incomplete." = "Flowlight inspeccionará localmente metadatos acotados de agentes en ~. No ejecutará archivos, subirá hallazgos ni entrará en carpetas multimedia protegidas. Los controles de privacidad de macOS aún pueden limitar la cobertura.";
+"The home folder is scanned by default. Add folders when agent metadata lives elsewhere; additions apply to the next explicit scan." = "La carpeta de inicio se analiza de forma predeterminada. Añade carpetas si los metadatos de agentes están en otro lugar; los cambios se aplican al siguiente análisis explícito.";
+"Home folder (default)" = "Carpeta de inicio (predeterminada)";
+"Scan configured agent folders?" = "¿Analizar las carpetas de agentes configuradas?";
+"Scan configured folders" = "Analizar carpetas configuradas";
+"Choose an additional folder for bounded local Agent metadata inspection. The folder is not scanned until you explicitly start an Agent advisory scan." = "Elige una carpeta adicional para inspeccionar metadatos locales de agentes de forma acotada. La carpeta no se analizará hasta que inicies explícitamente un análisis de avisos de agentes.";
+"Scanning accessible agent metadata in configured folders…" = "Analizando metadatos accesibles de agentes en las carpetas configuradas…";
+"Add scan folder…" = "Añadir carpeta de análisis…";
+"Remove scan folder" = "Eliminar carpeta de análisis";
+"Remove scan folder %@" = "Eliminar carpeta de análisis %@";
+"Start an explicit bounded scan of your home folder and any additional folders you selected. Hidden agent folders such as .claude and .codex are included; symlinks, generated folders, and unreadable locations are skipped and reported." = "Inicia un análisis explícito y acotado de tu carpeta de inicio y de las carpetas adicionales seleccionadas. Se incluyen carpetas ocultas como .claude y .codex; los enlaces simbólicos, las carpetas generadas y las ubicaciones ilegibles se omiten y se notifican.";
+
 /* Advisories executable version probing */
+"Home folder" = "Carpeta de inicio";
+"Inventory sources" = "Fuentes del inventario";
+"%lld found" = "%lld encontradas";
+"Complete" = "Completa";
+"Limited" = "Limitada";
+"Home folder scan" = "Análisis de la carpeta de inicio";
+"Home folder package scanning is paused." = "El análisis de paquetes de la carpeta de inicio está pausado.";
+"The home folder could not be read." = "No se pudo leer la carpeta de inicio.";
+"Recursive home scan · depth %lld · %lld directories · system, generated, hidden, and cache folders skipped." = "Análisis recursivo de inicio · profundidad %lld · %lld carpetas · se omiten carpetas ocultas, protegidas, de compilación y caché.";
+"Home scan is bounded at depth %lld and %lld directories; system, generated, hidden, and cache folders are skipped." = "El análisis de inicio está limitado a profundidad %lld y %lld carpetas; se omiten carpetas protegidas, ocultas, de compilación y caché.";
+"Scan home folder recursively" = "Analizar la carpeta de inicio recursivamente";
+"Pause home folder scanning" = "Pausar el análisis de la carpeta de inicio";
+"Flowlight reads package metadata locally with bounded depth and directory limits. It skips system, generated, hidden, and cache folders and never executes project code." = "Flowlight lee metadatos de paquetes localmente con límites de profundidad y carpetas. Omite carpetas protegidas, ocultas, de compilación y caché, y nunca ejecuta código del proyecto.";
+"Home folder scan is paused. Re-enable it to inspect package metadata under your home folder." = "El análisis de la carpeta de inicio está pausado. Actívelo de nuevo para inspeccionar metadatos de paquetes.";
+"Node packages and lockfiles are read locally under your home folder and any project folders you choose. Flowlight skips system, generated, and cache folders and never executes project code." = "Los paquetes Node y archivos de bloqueo se leen localmente en su carpeta de inicio y en los proyectos elegidos. Flowlight omite carpetas protegidas y generadas, y nunca ejecuta código del proyecto.";
+"This inventory may be incomplete. Only bounded, accessible sources are shown." = "Este inventario puede estar incompleto. Solo se muestran fuentes accesibles y limitadas.";
+"Limited source: %@" = "Fuente limitada: %@";
+"No accessible software was found. Home folder scanning is bounded and can be paused above; choose a project folder for an additional focused scan, or scan again." = "No se encontró software accesible. El análisis de inicio es limitado y puede pausarse arriba; elija un proyecto para un análisis adicional o vuelva a analizar.";
+"No accessible software was found in standard locations, the home folder, or selected project folders." = "No se encontró software accesible en ubicaciones estándar, la carpeta de inicio ni los proyectos seleccionados.";
+"Choose an additional project folder. Flowlight also scans bounded package metadata throughout your home folder, while skipping system, generated, and cache folders." = "Elija una carpeta de proyecto adicional. Flowlight también analiza metadatos limitados en su carpeta de inicio y omite carpetas protegidas y generadas.";
+"Choose an additional folder for bounded local Agent metadata inspection. The folder is not scanned until you explicitly start an Agent advisory scan." = "Elige una carpeta adicional para inspeccionar metadatos locales de agentes de forma acotada. La carpeta no se analizará hasta que inicies explícitamente un análisis de avisos de agentes.";
+"None selected. The Advisories page also performs a bounded home-folder package scan." = "Ninguna seleccionada. La página de avisos también analiza paquetes de forma limitada en la carpeta de inicio.";
+"Choose an additional bounded project folder; home-folder scanning is controlled on Advisories" = "Elija otra carpeta de proyecto limitada; el análisis de inicio se controla en Avisos";
+"Matching is local and advisory-only. Standard application, executable, Homebrew, and home-folder package locations are bounded; system, generated, and cache folders are skipped. Clearing this data removes the cached catalog and its local matches." = "La coincidencia es local y solo informativa. Las ubicaciones estándar de aplicaciones, ejecutables, Homebrew y paquetes de inicio son limitadas; se omiten carpetas protegidas y generadas. Al borrar se eliminan el catálogo y las coincidencias locales.";
+"Inspect project packages" = "Inspeccionar paquetes del proyecto";
+"Node packages and lockfiles are read only inside folders you choose. Flowlight never crawls your whole home folder." = "Los paquetes de Node y los archivos de bloqueo solo se leen en las carpetas que eliges. Flowlight nunca recorre toda tu carpeta de inicio.";
+"No project folder selected yet." = "Aún no se ha seleccionado ninguna carpeta de proyecto.";
+"Selected project folders: %lld" = "Carpetas de proyecto seleccionadas: %lld";
+"No accessible software was found. Choose a project folder to inspect bounded package metadata, or scan again." = "No se encontró software accesible. Elige una carpeta de proyecto para inspeccionar metadatos de paquetes de forma acotada o vuelve a analizar.";
+"Choose a project folder. Flowlight reads bounded package metadata inside it; it never crawls your whole home folder." = "Elige una carpeta de proyecto. Flowlight lee metadatos de paquetes de forma acotada; nunca recorre toda tu carpeta de inicio.";
+"Choose a project folder to inspect bounded package metadata" = "Elegir una carpeta de proyecto para inspeccionar metadatos de paquetes";
 "Identify executable versions" = "Identificar versiones de ejecutables";
 "Runs bounded local version checks for supported executables; inventory never leaves this Mac." = "Comprobaciones locales acotadas para ejecutables compatibles; el inventario nunca sale de este Mac.";
 "Stop" = "Detener";
@@ -8,11 +71,19 @@
 "Checked %lld of %lld supported executables" = "Se comprobaron %lld de %lld ejecutables compatibles";
 "%lld supported executable%@ found. Version checks are explicit and time-limited." = "Se encontraron %lld ejecutables compatibles. Las comprobaciones de versión son explícitas y tienen un límite de tiempo.";
 "No supported executable versions were found to identify." = "No se encontraron versiones de ejecutables compatibles para identificar.";
-"Identified %lld of %lld executable versions; some remain unknown." = "Se identificaron %lld de %lld versiones de ejecutables; algunas siguen siendo desconocidas.";
+"Identified %lld of %lld executable versions; some remain unavailable." = "Se identificaron %lld de %lld versiones de ejecutables; algunas siguen sin estar disponibles.";
 "Identified %lld of %lld executable versions." = "Se identificaron %lld de %lld versiones de ejecutables.";
 "Executable version output" = "Salida de versión del ejecutable";
 "Packages" = "Paquetes";
 "Version identified" = "Versión identificada";
+"Executable metadata" = "Metadatos del ejecutable";
+"Needs review" = "Requiere revisión";
+"Version check available" = "Comprobación de versión disponible";
+"Version not checked" = "Versión no comprobada";
+"No authoritative version" = "Sin versión acreditada";
+"Version recorded; comparison unavailable" = "Versión registrada; comparación no disponible";
+"No version evidence" = "Sin evidencia de versión";
+"Not assessed for version" = "Versión no evaluada";
 "Version check not attempted" = "Comprobación de versión no realizada";
 "Executable unavailable" = "Ejecutable no disponible";
 "Version command failed" = "Falló el comando de versión";
@@ -2150,3 +2221,33 @@
 "Review new alerts in Flowlight" = "Revisar alertas nuevas en Flowlight";
 "Runtime" = "Tiempo de ejecución";
 "The selected pack is configured but is not blocking until the Network Extension and inspection matcher both acknowledge the exact desired digest." = "El paquete seleccionado está configurado, pero no bloqueará hasta que la extensión de red y el comparador de inspección confirmen el resumen exacto deseado.";
+
+/* Agent advisory analysis */
+"Advisory analysis" = "Análisis de avisos";
+"Allow home folder scans?" = "¿Permitir el análisis de la carpeta de inicio?";
+"Allow scans" = "Permitir análisis";
+"Apple on-device model" = "Modelo local de Apple";
+"Inventory only" = "Solo inventario";
+"This Mac can't run the on-device model." = "Este Mac no puede ejecutar el modelo local.";
+"With your consent, Flowlight scans your home folder and any folders you add." = "Con tu permiso, Flowlight analiza tu carpeta de inicio y las carpetas que añadas.";
+"Reviewing scan evidence on this Mac…" = "Revisando las evidencias en este Mac…";
+"No evidence available for model analysis." = "No hay evidencias para el análisis del modelo.";
+"The inventory is available below." = "El inventario aparece más abajo.";
+"Evidence: %@" = "Evidencias: %@";
+"Artifact" = "Artefacto";
+"Provenance" = "Procedencia";
+"Supported settings inspected: %lld of %lld found" = "Configuraciones compatibles revisadas: %lld de %lld encontradas";
+"Findings hidden by the display limit: %lld" = "Hallazgos ocultos por el límite de visualización: %lld";
+"Choose an additional folder for local agent settings scans." = "Elige otra carpeta para analizar localmente la configuración de agentes.";
+
+/* AI Agents activity coverage */
+"Loading agent activity…" = "Cargando actividad de agentes…";
+"Refreshing agent activity…" = "Actualizando actividad de agentes…";
+"Could not load agent activity." = "No se pudo cargar la actividad de los agentes.";
+"Showing %lld of %lld agent traffic relationships. Traffic totals are complete." = "Se muestran %lld de %lld relaciones de tráfico de agentes. Los totales de tráfico están completos.";
+"Inspection detail is partial for this window." = "Los detalles de inspección de este período son parciales.";
+"%lld traffic relationships omitted for this agent. Destination and tool detail is partial." = "Se omiten %lld relaciones de tráfico de este agente. Los detalles de destinos y herramientas son parciales.";
+"Destination policy coverage is partial." = "La cobertura de las políticas de destino es parcial.";
+"Showing %lld of %lld destinations." = "Se muestran %lld de %lld destinos.";
+"Showing %lld of %lld tool calls." = "Se muestran %lld de %lld llamadas a herramientas.";
+"Partial" = "Parcial";
