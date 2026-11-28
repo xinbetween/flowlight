@@ -1,5 +1,15 @@
 /* Analysis/AnomalyEngine.swift */
 
+/* Software advisory details */
+"Software identity" = "ソフトウェアの識別情報";
+"Assessment" = "評価";
+"Build" = "ビルド";
+"Version evidence" = "バージョンの根拠";
+"Copy Path" = "パスをコピー";
+"Published" = "公開日";
+"Last modified" = "最終更新日";
+"Catalog evidence" = "カタログの検証情報";
+
 /* Software inventory coverage */
 "Packages & Executables" = "パッケージと実行ファイル";
 

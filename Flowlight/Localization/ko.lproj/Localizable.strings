@@ -1,5 +1,15 @@
 /* Analysis/AnomalyEngine.swift */
 
+/* Software advisory details */
+"Software identity" = "소프트웨어 식별 정보";
+"Assessment" = "평가";
+"Build" = "빌드";
+"Version evidence" = "버전 근거";
+"Copy Path" = "경로 복사";
+"Published" = "게시일";
+"Last modified" = "마지막 수정일";
+"Catalog evidence" = "카탈로그 근거";
+
 /* Software inventory coverage */
 "Packages & Executables" = "패키지 및 실행 파일";
 

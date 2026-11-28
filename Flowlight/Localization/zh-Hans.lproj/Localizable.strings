@@ -1,5 +1,15 @@
 /* Analysis/AnomalyEngine.swift */
 
+/* Software advisory details */
+"Software identity" = "软件标识";
+"Assessment" = "评估";
+"Build" = "构建版本";
+"Version evidence" = "版本依据";
+"Copy Path" = "复制路径";
+"Published" = "发布日期";
+"Last modified" = "最后修改日期";
+"Catalog evidence" = "目录验证信息";
+
 /* Software inventory coverage */
 "Packages & Executables" = "软件包和可执行文件";
 

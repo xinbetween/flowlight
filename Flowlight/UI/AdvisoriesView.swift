@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// A local-first view of advisories for bundles, executables, Homebrew formulae, and selected project packages.
@@ -121,7 +122,8 @@ struct AdvisoriesView: View {
         }
         .onDisappear { probeRunID = nil }
         .sheet(item: selectedBinding) { row in
-            AdvisoryDetailView(row: row, catalogState: store.catalogState)
+            AdvisoryDetailView(row: row, catalogState: store.catalogState, catalogReady: store.catalogReady,
+                               status: statusTitle(for: row), version: row.artifact.version ?? versionText(for: row))
         }
     }
 
@@ -686,86 +688,191 @@ struct AdvisoriesView: View {
 private struct AdvisoryDetailView: View {
     let row: AdvisoriesView.Row
     let catalogState: AdvisoryCatalogState?
+    let catalogReady: Bool
+    let status: String
+    let version: String
     @Environment(\.dismiss) private var dismiss
 
+    private var artifact: AdvisoryArtifact { row.artifact }
+    private var hasMatches: Bool { catalogReady && row.isAffected }
+
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: Spacing.m) {
-                    FLContextRow(
-                        title: L("Software identity"),
-                        details: [row.artifact.kind.title, row.artifact.identifier, row.artifact.path,
-                                  versionText, L("Evidence: %@", evidenceText)],
-                        systemImage: row.artifact.kind.systemImage,
-                        identifier: "advisories.detail.identity"
-                    )
-                    if row.matches.isEmpty {
-                        Label(L("No confirmed advisory match is available for this identity and catalog; this is not a safety claim."),
-                              systemImage: "info.circle")
-                            .foregroundStyle(.secondary)
-                            .padding(Spacing.m)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .flCard()
-                            .accessibilityIdentifier("advisories.detail.no-match")
-                    } else {
-                        ForEach(row.matches) { advisory in
-                            VStack(alignment: .leading, spacing: 5) {
-                                HStack {
-                                    Text(advisory.cveID).font(.headline.monospaced())
-                                    Spacer()
-                                    FLPill(text: L("Affected"), systemImage: "exclamationmark.triangle.fill", color: FL.critical)
-                                }
-                                if let summary = advisory.summary { Text(summary).font(.callout) }
-                                if let published = advisory.published {
-                                    Text(L("Published %@", published.formatted(date: .abbreviated, time: .omitted)))
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                            .padding(Spacing.m)
-                            .flCard()
-                            .accessibilityIdentifier("advisories.detail.\(advisory.id)")
-                        }
-                    }
-                    if let receipt = catalogState?.receipt {
-                        Text(L("Catalog sequence %lld · accepted %@ · matching stayed on this Mac.",
-                               receipt.sequence, receipt.acceptedAt.formatted(date: .abbreviated, time: .shortened)))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
+                LazyVStack(alignment: .leading, spacing: Spacing.l) {
+                    header
+                    identity
+                    assessment
+                    catalogEvidence
                 }
                 .padding(Spacing.l)
             }
-            .navigationTitle(row.artifact.name)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button(L("Done")) { dismiss() } }
+            Divider()
+            HStack {
+                Spacer()
+                Button(L("Done")) { dismiss() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
             }
+            .padding(.horizontal, Spacing.l)
+            .padding(.vertical, Spacing.m)
         }
-        .frame(minWidth: 560, minHeight: 360)
+        .frame(width: 620, height: hasMatches ? 580 : 490)
+        .accessibilityIdentifier("advisories.detail")
     }
 
-    private var versionText: String {
-        guard let version = row.artifact.version else {
-            if let probeStatus = row.probeStatus {
-                switch probeStatus {
-                case .found: return L("Version identified")
-                case .notAttempted: return L("Version check not attempted")
-                case .unavailable: return L("Executable unavailable")
-                case .nonZeroExit: return L("Version command failed")
-                case .timedOut: return L("Version check timed out")
-                case .outputLimitExceeded: return L("Version output exceeded the limit")
-                case .cancelled: return L("Version check cancelled")
-                case .invalidOutput: return L("Version output not recognized")
-                }
+    private var header: some View {
+        HStack(alignment: .center, spacing: Spacing.m) {
+            if artifact.kind == .application, let iconPath = artifact.iconPath {
+                AppIconView(path: iconPath, size: 44)
+            } else {
+                Image(systemName: artifact.kind.systemImage)
+                    .font(.title2.weight(.medium))
+                    .foregroundStyle(FL.accent)
+                    .frame(width: 44, height: 44)
+                    .background(FL.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.chip))
+                    .accessibilityHidden(true)
             }
-            if row.artifact.kind == .executable {
-                return ExecutableVersionProbe.isEligible(row.artifact)
-                    ? L("Version check available")
-                    : L("No authoritative version")
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Text(verbatim: artifact.name)
+                    .font(.title2.weight(.semibold))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                Text(artifact.packageManager?.title ?? artifact.kind.title)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
-            return L("No version evidence")
+            Spacer(minLength: Spacing.s)
+            // Keep a benign-looking checkmark out of the no-match and unavailable states.
+            FLPill(text: status, systemImage: hasMatches ? "exclamationmark.triangle.fill" : "info.circle",
+                   color: hasMatches ? FL.critical : (catalogReady && !row.isUnknown ? .secondary : FL.warning))
         }
-        if let build = row.artifact.buildVersion, build != version { return L("Version %@ · build %@", version, build) }
-        return version
+        .accessibilityIdentifier("advisories.detail.header")
     }
+
+    private var identity: some View {
+        VStack(alignment: .leading, spacing: Spacing.m) {
+            Text(L("Software identity"))
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+            Grid(alignment: .leading, horizontalSpacing: Spacing.l, verticalSpacing: Spacing.s) {
+                metadata(L("Identity"), artifact.identifier, monospaced: true)
+                metadata(L("Version"), version, monospaced: artifact.version != nil)
+                if let build = artifact.buildVersion { metadata(L("Build"), build, monospaced: true) }
+                metadata(L("Source"), artifact.source)
+                metadata(L("Version evidence"), evidenceText)
+            }
+            Divider()
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                HStack {
+                    Label(L("Path"), systemImage: "folder")
+                        .font(.callout.weight(.medium))
+                    Spacer()
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(artifact.path, forType: .string)
+                    } label: {
+                        Label(L("Copy Path"), systemImage: "doc.on.doc")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .accessibilityIdentifier("advisories.detail.copy-path")
+                }
+                Text(verbatim: artifact.path)
+                    .font(.callout.monospaced())
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("advisories.detail.path")
+            }
+        }
+        .padding(Spacing.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .flCard()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("advisories.detail.identity")
+    }
+
+    private var assessment: some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            Text(L("Assessment")).font(.headline).accessibilityAddTraits(.isHeader)
+            if hasMatches {
+                ForEach(row.matches) { advisory in
+                    VStack(alignment: .leading, spacing: Spacing.s) {
+                        Text(verbatim: advisory.cveID)
+                            .font(.headline.monospaced())
+                            .textSelection(.enabled)
+                        if let summary = advisory.summary {
+                            Text(verbatim: summary).font(.callout).fixedSize(horizontal: false, vertical: true)
+                        }
+                        if advisory.published != nil || advisory.lastModified != nil {
+                            Grid(alignment: .leading, horizontalSpacing: Spacing.l, verticalSpacing: Spacing.xs) {
+                                if let published = advisory.published {
+                                    metadata(L("Published"), published.formatted(date: .abbreviated, time: .omitted))
+                                }
+                                if let modified = advisory.lastModified {
+                                    metadata(L("Last modified"), modified.formatted(date: .abbreviated, time: .omitted))
+                                }
+                            }
+                        }
+                    }
+                    .padding(Spacing.m)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .flCard()
+                    .accessibilityIdentifier("advisories.detail.\(advisory.id)")
+                }
+            } else {
+                Text(assessmentExplanation)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier(catalogReady && !row.isUnknown ? "advisories.detail.no-match" : "advisories.detail.not-assessed")
+            }
+        }
+    }
+
+    private var assessmentExplanation: String {
+        if !catalogReady { return L("No verified catalog installed") }
+        if row.isUnknown {
+            return artifact.hasRecordedVersionEvidence
+                ? L("Version recorded; comparison unavailable")
+                : L("No authoritative version")
+        }
+        return L("No confirmed advisory match is available for this identity and catalog; this is not a safety claim.")
+    }
+
+    private var catalogEvidence: some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Divider()
+            Label(L("Catalog evidence"), systemImage: "checkmark.shield")
+                .font(.caption.weight(.semibold))
+                .accessibilityAddTraits(.isHeader)
+            if let receipt = catalogState?.receipt {
+                Text(L("Catalog sequence %lld · accepted %@ · matching stayed on this Mac.",
+                       receipt.sequence, receipt.acceptedAt.formatted(date: .abbreviated, time: .shortened)))
+            } else {
+                Text(L("Software inventory never leaves this Mac"))
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .accessibilityIdentifier("advisories.detail.catalog")
+    }
+
+    private func metadata(_ title: String, _ value: String, monospaced: Bool = false) -> some View {
+        GridRow(alignment: .firstTextBaseline) {
+            Text(title)
+                .foregroundStyle(.secondary)
+                .gridColumnAlignment(.leading)
+            Text(verbatim: value)
+                .font(monospaced ? .callout.monospaced() : .callout)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .gridColumnAlignment(.leading)
+        }
+        .font(.callout)
+    }
+
     private var evidenceText: String {
         switch row.artifact.versionEvidence {
         case .bundleInfoDictionary: return L("Info.plist")

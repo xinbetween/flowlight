@@ -1,5 +1,15 @@
 /* Analysis/AnomalyEngine.swift */
 
+/* Software advisory details */
+"Software identity" = "Identidad del software";
+"Assessment" = "Evaluación";
+"Build" = "Compilación";
+"Version evidence" = "Evidencia de versión";
+"Copy Path" = "Copiar ruta";
+"Published" = "Publicado";
+"Last modified" = "Última modificación";
+"Catalog evidence" = "Evidencia del catálogo";
+
 /* Software inventory coverage */
 "Packages & Executables" = "Paquetes y ejecutables";
 

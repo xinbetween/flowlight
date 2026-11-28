@@ -1,5 +1,15 @@
 /* Analysis/AnomalyEngine.swift */
 
+/* Software advisory details */
+"Software identity" = "軟體識別資訊";
+"Assessment" = "評估";
+"Build" = "組建版本";
+"Version evidence" = "版本依據";
+"Copy Path" = "複製路徑";
+"Published" = "發佈日期";
+"Last modified" = "最後修改日期";
+"Catalog evidence" = "目錄驗證資訊";
+
 /* Software inventory coverage */
 "Packages & Executables" = "套件與執行檔";
 
