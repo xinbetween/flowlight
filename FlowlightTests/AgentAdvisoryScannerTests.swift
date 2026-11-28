@@ -118,10 +118,14 @@ final class AgentAdvisoryScannerTests: XCTestCase {
                  ${API_\
                  KEY}"""
             """#, to: ".codex/reference.toml", under: root)
+            try write(#"""
+            api_key = """synthetic-TOML\U0000002Dvalue\U0001F510"""
+            """#, to: ".codex/unicode.toml", under: root)
 
             let scan = AgentAdvisoryScanner(configuration: .init(roots: [root])).scan()
             let credentials = scan.findings.filter { $0.category == .credentials }
-            XCTAssertEqual(credentials.map(\.source), ["scan-root/.codex/config.toml", "scan-root/.codex/literal.toml"])
+            XCTAssertEqual(credentials.map(\.source), ["scan-root/.codex/config.toml", "scan-root/.codex/literal.toml",
+                                                       "scan-root/.codex/unicode.toml"])
             XCTAssertTrue(credentials.allSatisfy { $0.severity == .critical })
             XCTAssertFalse(String(reflecting: scan).contains("synthetic-TOML-"))
             XCTAssertFalse(AgentAdvisoryAnalysisInput(result: scan).prompt.contains("synthetic-TOML-"))
@@ -146,11 +150,21 @@ final class AgentAdvisoryScannerTests: XCTestCase {
               synthetic-YAML-block
               second-line
             """#, to: ".continue/block.yml", under: root)
+            try write(#"""
+            "api_key" : "synthetic-YAML-block-key"
+            """#, to: ".continue/spaced-block.yml", under: root)
+            try write(#"""
+            env: {
+              public: true,
+              api_key : synthetic-YAML-flow-key
+            }
+            """#, to: ".continue/spaced-flow.yml", under: root)
 
             let scan = AgentAdvisoryScanner(configuration: .init(roots: [root])).scan()
             let credentials = scan.findings.filter { $0.category == .credentials }
             XCTAssertEqual(credentials.map(\.source), ["scan-root/.continue/block.yml", "scan-root/.continue/inline.yaml",
-                                                       "scan-root/.continue/nested.yaml", "scan-root/.continue/sequence.yml"])
+                                                       "scan-root/.continue/nested.yaml", "scan-root/.continue/sequence.yml",
+                                                       "scan-root/.continue/spaced-block.yml", "scan-root/.continue/spaced-flow.yml"])
             XCTAssertTrue(credentials.allSatisfy { $0.severity == .critical })
             XCTAssertFalse(String(reflecting: scan).contains("synthetic-YAML-"))
             XCTAssertFalse(AgentAdvisoryAnalysisInput(result: scan).prompt.contains("synthetic-YAML-"))
@@ -171,6 +185,12 @@ final class AgentAdvisoryScannerTests: XCTestCase {
               - token: ${TOKEN}
             text: a quoted example of {token: sample-inside-plain-text}
             other: { note: '{password: sample-inside-quoted-text}', token: '$API_TOKEN' }
+            description: "The configuration reference shows:
+              api_key: sample-inside-multiline-description
+              and then continues."
+            notes: { description: 'The example continues:
+              env: { api_key: sample-inside-multiline-flow },
+              followed by more prose.' }
             password: |
               ${PASSWORD}
             """#, to: ".continue/config.yaml", under: root)

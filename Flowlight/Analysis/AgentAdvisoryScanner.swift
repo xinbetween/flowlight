@@ -764,19 +764,21 @@ struct AgentAdvisoryScanner {
         | \#(basicString) | \#(literalString) | \x23[^\r\n]*
         """#, options: [.caseInsensitive, .anchorsMatchLines, .allowCommentsAndWhitespace]
     )
-    private static let tomlBasicToken = try! NSRegularExpression(pattern: #"\\[\t ]*(?:\r\n|\n)\s*|(\\[\s\S])|\r\n|["\t\r\n]"#)
+    private static let tomlBasicToken = try! NSRegularExpression(pattern: #"\\[\t ]*(?:\r\n|\n)\s*|\\U([a-fA-F0-9]{8})|(\\[\s\S])|\r\n|["\t\r\n]"#)
 
     private static let yamlSingleQuoted = #"'(?:[^'\r\n]++|'')*+'"#
     private static let yamlQuoted = "(?:\(basicString)|\(yamlSingleQuoted))"
+    private static let yamlMultilineQuoted = #"(?:"(?:[^"\\]++|\\[\s\S])*+"|'(?:[^']++|'')*+')"#
+    private static let yamlQuotedValue = try! NSRegularExpression(pattern: yamlMultilineQuoted)
     private static let yamlBlockEntry = try! NSRegularExpression(
-        pattern: #"^(\#(yamlQuoted)|[^\s\[\]{}"'#:][^:]*?):(?=[\t ]|\z)[\t ]*"#
+        pattern: #"^(\#(yamlQuoted)|[^\s\[\]{}"'#:][^:]*?)[\t ]*:(?=[\t ]|\z)[\t ]*"#
     )
     private static let yamlFlowToken = try! NSRegularExpression(
         pattern: #"""
-        (?:^|(?<=[{,]))[\t\x20]*
-        (?:\#(credentialKey):[\t\x20]+|(?:"\#(credentialKey)"|'\#(credentialKey)'):(?:[\t\x20]+|(?=["'])))
-        (\#(yamlQuoted)|[^\s\x23"'\[\]{},>|*&!][^\[\]{},\r\n]*+)(?=[\t\x20]*(?:[,}]|\x23|\z))
-        | \#(yamlQuoted) | (?:^|(?<=\s))\x23[^\r\n]* | [\[\]{}]
+        (?<=[{,])\s*
+        (?:\#(credentialKey)[\t\x20]*:\s+|(?:"\#(credentialKey)"|'\#(credentialKey)')[\t\x20]*:(?:\s+|(?=["'])))
+        (\#(yamlMultilineQuoted)|[^\s\x23"'\[\]{},>|*&!][^\[\]{},\r\n]*+)(?=\s*(?:[,}]|\x23|\z))
+        | \#(yamlMultilineQuoted) | (?:^|(?<=\s))\x23[^\r\n]* | [\[\]{}]
         """#, options: [.caseInsensitive, .allowCommentsAndWhitespace]
     )
     private static let yamlComment = try! NSRegularExpression(pattern: #"(?:^|(?<=\s))#"#)
@@ -814,10 +816,21 @@ struct AgentAdvisoryScanner {
         guard raw.first == "\"" else { return body }
         var json = "\""
         var cursor = body.startIndex
-        tomlBasicToken.enumerateMatches(in: body, range: NSRange(body.startIndex..., in: body)) { match, _, _ in
+        var valid = true
+        tomlBasicToken.enumerateMatches(in: body, range: NSRange(body.startIndex..., in: body)) { match, _, stop in
             guard let match, let token = Range(match.range, in: body) else { return }
             json += body[cursor..<token.lowerBound]
-            if match.range(at: 1).location != NSNotFound {
+            if let digits = Range(match.range(at: 1), in: body) {
+                guard let codePoint = UInt32(body[digits], radix: 16), let scalar = Unicode.Scalar(codePoint) else {
+                    valid = false
+                    stop.pointee = true
+                    return
+                }
+                // TOML permits eight-digit escapes. Encode the scalar as JSON UTF-16 escapes.
+                for unit in String(scalar).utf16 {
+                    json += String(format: "\\u%04X", UInt32(unit))
+                }
+            } else if match.range(at: 2).location != NSNotFound {
                 json += body[token]
             } else {
                 switch body[token] {
@@ -830,6 +843,7 @@ struct AgentAdvisoryScanner {
             }
             cursor = token.upperBound
         }
+        guard valid else { return nil }
         json += body[cursor...]
         return decodeQuotedString(json + "\"")
     }
@@ -839,9 +853,10 @@ struct AgentAdvisoryScanner {
     }
 
     private static func yamlHasLiteralCredential(_ text: String) -> Bool {
-        var flow = [Character]()
+        var consumed = text.startIndex
         var block: (indent: Int, credential: Bool, value: String)?
         for line in text.split(whereSeparator: \.isNewline) {
+            if line.startIndex < consumed { continue }
             let content = line.drop(while: \.isWhitespace)
             if content.isEmpty { continue }
             let indent = line.distance(from: line.startIndex, to: content.startIndex)
@@ -857,10 +872,6 @@ struct AgentAdvisoryScanner {
                 block = nil
             }
             if content.first == "#" { continue }
-            if !flow.isEmpty {
-                if yamlFlowHasLiteralCredential(String(content), stack: &flow) { return true }
-                continue
-            }
 
             var entry = content
             var blockIndent = indent
@@ -870,28 +881,43 @@ struct AgentAdvisoryScanner {
                 entry = entry.dropFirst().drop(while: \.isWhitespace)
             }
             let item = String(entry)
-            var value = item
+            var value = entry
             var credential = false
             if let match = yamlBlockEntry.firstMatch(in: item, range: NSRange(item.startIndex..., in: item)),
                let key = Range(match.range(at: 1), in: item), let prefix = Range(match.range, in: item) {
                 credential = isCredentialKey(item[key].trimmingCharacters(in: CharacterSet(charactersIn: "\"' \t")))
                 blockIndent = line.distance(from: line.startIndex, to: entry.startIndex)
-                value = String(item[prefix.upperBound...])
+                value = entry.dropFirst(item.distance(from: item.startIndex, to: prefix.upperBound))
             }
-            if yamlBlockHeader.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)) != nil {
+            let scalar = String(value)
+            if yamlBlockHeader.firstMatch(in: scalar, range: NSRange(scalar.startIndex..., in: scalar)) != nil {
                 block = (blockIndent, credential, "")
             } else if value.first == "{" || value.first == "[" {
-                if yamlFlowHasLiteralCredential(value, stack: &flow) { return true }
-            } else if credential, yamlScalarIsCredential(value) {
+                let flow = yamlFlowCredential(in: text, from: value.startIndex)
+                if flow.found { return true }
+                consumed = flow.end
+            } else if value.first == "\"" || value.first == "'" {
+                // Quotes can span lines, with mapping-like text inside the scalar.
+                let range = NSRange(value.startIndex..., in: text)
+                guard let match = yamlQuotedValue.firstMatch(in: text, options: .anchored, range: range),
+                      let literal = Range(match.range, in: text) else { return false }
+                consumed = literal.upperBound
+                if credential {
+                    let endOfLine = text[consumed...].firstIndex(where: \.isNewline) ?? text.endIndex
+                    if yamlScalarIsCredential(String(text[literal.lowerBound..<endOfLine])) { return true }
+                }
+            } else if credential, yamlScalarIsCredential(scalar) {
                 return true
             }
         }
         return block.map { $0.credential && isPlausibleCredentialLiteral($0.value) } ?? false
     }
 
-    private static func yamlFlowHasLiteralCredential(_ text: String, stack: inout [Character]) -> Bool {
+    private static func yamlFlowCredential(in text: String, from start: String.Index) -> (found: Bool, end: String.Index) {
+        var stack = [Character]()
         var found = false
-        yamlFlowToken.enumerateMatches(in: text, range: NSRange(text.startIndex..., in: text)) { match, _, stop in
+        var end = text.endIndex
+        yamlFlowToken.enumerateMatches(in: text, range: NSRange(start..., in: text)) { match, _, stop in
             guard let match, let token = Range(match.range, in: text) else { return }
             if let value = Range(match.range(at: 1), in: text) {
                 if stack.last == "{", yamlScalarIsCredential(String(text[value])) {
@@ -903,23 +929,28 @@ struct AgentAdvisoryScanner {
                 case "{", "[": stack.append(text[token].first!)
                 case "}", "]":
                     if !stack.isEmpty { stack.removeLast() }
-                    if stack.isEmpty { stop.pointee = true }
+                    if stack.isEmpty {
+                        end = token.upperBound
+                        stop.pointee = true
+                    }
                 default: break
                 }
             }
         }
-        return found
+        return (found, end)
     }
 
     private static func yamlScalarIsCredential(_ raw: String) -> Bool {
         let scalar = raw.trimmingCharacters(in: .whitespaces)
         if scalar.hasPrefix("\"") || scalar.hasPrefix("'") {
-            let pattern = scalar.hasPrefix("\"") ? basicString : yamlSingleQuoted
-            guard let quoted = scalar.range(of: "^" + pattern, options: .regularExpression) else { return false }
+            let range = NSRange(scalar.startIndex..., in: scalar)
+            guard let match = yamlQuotedValue.firstMatch(in: scalar, options: .anchored, range: range),
+                  let quoted = Range(match.range, in: scalar) else { return false }
             let tail = scalar[quoted.upperBound...].trimmingCharacters(in: .whitespaces)
             guard tail.isEmpty || tail.first == "#" else { return false }
-            let value = scalar.hasPrefix("\"") ? decodeQuotedString(String(scalar[quoted]))
-                : scalar[quoted].dropFirst().dropLast().replacingOccurrences(of: "''", with: "'")
+            let literal = scalar[quoted].replacingOccurrences(of: #"[\t ]*\R[\t ]*"#, with: " ", options: .regularExpression)
+            let value = scalar.hasPrefix("\"") ? decodeQuotedString(literal)
+                : literal.dropFirst().dropLast().replacingOccurrences(of: "''", with: "'")
             return value.map(isPlausibleCredentialLiteral) ?? false
         }
         let comment = yamlComment.firstMatch(in: scalar, range: NSRange(scalar.startIndex..., in: scalar))
