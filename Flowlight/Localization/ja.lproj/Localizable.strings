@@ -17,7 +17,6 @@
 "Agent advisories" = "エージェントのアドバイザリ";
 "Software" = "ソフトウェア";
 "Local agent metadata · bounded, no execution" = "ローカルエージェントメタデータ · 制限付き、実行なし";
-"Agent security inventory" = "エージェントセキュリティインベントリ";
 "Scan agent files" = "エージェントファイルをスキャン";
 "Scan /" = "/ をスキャン";
 "Scanning accessible agent metadata under /…" = "/ 以下のアクセス可能なエージェントメタデータをスキャン中…";
@@ -57,23 +56,14 @@
 "Recursive home scan · depth %lld · %lld directories · system, generated, hidden, and cache folders skipped." = "ホームフォルダを再帰スキャン · 深さ %lld · %lld フォルダ · 隠し、保護、ビルド、キャッシュフォルダを除外。";
 "Home scan is bounded at depth %lld and %lld directories; system, generated, hidden, and cache folders are skipped." = "ホームスキャンは深さ %lld、%lld フォルダまでに制限され、保護、隠し、ビルド、キャッシュフォルダを除外します。";
 "Scan home folder recursively" = "ホームフォルダを再帰的にスキャン";
-"Pause home folder scanning" = "ホームフォルダのスキャンを一時停止";
 "Flowlight reads package metadata locally with bounded depth and directory limits. It skips system, generated, hidden, and cache folders and never executes project code." = "Flowlight は深さとフォルダ数を制限してパッケージメタデータをローカルで読み取ります。保護、隠し、ビルド、キャッシュフォルダを除外し、プロジェクトコードは実行しません。";
 "Home folder scan is paused. Re-enable it to inspect package metadata under your home folder." = "ホームフォルダのスキャンは一時停止中です。再開するとパッケージメタデータを確認できます。";
-"Node packages and lockfiles are read locally under your home folder and any project folders you choose. Flowlight skips system, generated, and cache folders and never executes project code." = "Node パッケージとロックファイルはホームフォルダおよび選択したプロジェクト内でローカルに読み取られます。保護、生成フォルダを除外し、プロジェクトコードは実行しません。";
 "This inventory may be incomplete. Only bounded, accessible sources are shown." = "このインベントリは不完全な可能性があります。制限内でアクセスできたソースのみ表示します。";
-"Limited source: %@" = "制限されたソース: %@";
-"No accessible software was found. Home folder scanning is bounded and can be paused above; choose a project folder for an additional focused scan, or scan again." = "アクセス可能なソフトウェアが見つかりません。ホームスキャンは制限付きで、上で一時停止できます。追加のプロジェクトを選ぶか再スキャンしてください。";
-"No accessible software was found in standard locations, the home folder, or selected project folders." = "標準の場所、ホームフォルダ、選択したプロジェクトフォルダにアクセス可能なソフトウェアが見つかりません。";
 "Choose an additional project folder. Flowlight also scans bounded package metadata throughout your home folder, while skipping system, generated, and cache folders." = "追加のプロジェクトフォルダを選択してください。Flowlight はホームフォルダの制限付きパッケージメタデータもスキャンし、保護・生成フォルダを除外します。";
 "Choose an additional folder for bounded local Agent metadata inspection. The folder is not scanned until you explicitly start an Agent advisory scan." = "エージェントメタデータを限定的にローカル検査する追加フォルダを選択してください。明示的にエージェントアドバイザリスキャンを開始するまで、フォルダはスキャンされません。";
 "None selected. The Advisories page also performs a bounded home-folder package scan." = "未選択です。アドバイザリページではホームフォルダの制限付きパッケージスキャンも行います。";
-"Choose an additional bounded project folder; home-folder scanning is controlled on Advisories" = "追加の制限付きプロジェクトフォルダを選択。ホームスキャンはアドバイザリで設定します";
 "Matching is local and advisory-only. Standard application, executable, Homebrew, and home-folder package locations are bounded; system, generated, and cache folders are skipped. Clearing this data removes the cached catalog and its local matches." = "照合はローカルのみで助言目的です。アプリ、実行ファイル、Homebrew、ホームフォルダのパッケージ場所は制限され、保護・生成フォルダは除外されます。消去するとキャッシュ済みカタログとローカルの一致結果を削除します。";
-"Inspect project packages" = "プロジェクトパッケージを確認";
 "Node packages and lockfiles are read only inside folders you choose. Flowlight never crawls your whole home folder." = "Node パッケージとロックファイルは、選択したフォルダ内だけで読み取ります。Flowlight がホームフォルダ全体を走査することはありません。";
-"No project folder selected yet." = "プロジェクトフォルダがまだ選択されていません。";
-"Selected project folders: %lld" = "選択したプロジェクトフォルダ：%lld";
 "No accessible software was found. Choose a project folder to inspect bounded package metadata, or scan again." = "アクセス可能なソフトウェアが見つかりません。プロジェクトフォルダを選択してパッケージメタデータを限定的に確認するか、再スキャンしてください。";
 "Choose a project folder. Flowlight reads bounded package metadata inside it; it never crawls your whole home folder." = "プロジェクトフォルダを選択してください。Flowlight はその中のパッケージメタデータを限定的に読み取り、ホームフォルダ全体を走査することはありません。";
 "Choose a project folder to inspect bounded package metadata" = "限定的なパッケージメタデータを確認するプロジェクトフォルダを選択";
@@ -2271,3 +2261,19 @@
 "The agent's destination policy was saved, but Flowlight couldn't fully apply it: %@" = "エージェントの接続先ポリシーは保存されましたが、Flowlight で完全に適用できませんでした：%@";
 "Updating policy…" = "ポリシーを更新中…";
 "Partly allowed" = "一部許可";
+
+/* Advisories dashboards */
+"Software inventory" = "ソフトウェア一覧";
+"%lld software artifacts" = "%lld 件のソフトウェア項目";
+"Inventory overview" = "インベントリの概要";
+"Inventory sources and catalog" = "インベントリのソースとカタログ";
+"Agent Advisories Settings" = "エージェントのアドバイザリ設定";
+"Software Advisories Settings" = "ソフトウェアのアドバイザリ設定";
+"No accessible software was found. Use Software Advisories Settings to choose a project folder." = "アクセス可能なソフトウェアが見つかりません。ソフトウェアのアドバイザリ設定でプロジェクトフォルダを選択してください。";
+"No findings" = "検出項目なし";
+"Review scan coverage for the locations and files that were inspected." = "検査した場所とファイルはスキャン範囲で確認できます。";
+"Try another severity or surface filter." = "別の重大度または対象のフィルタを試してください。";
+"Scan overview" = "スキャンの概要";
+"Scan coverage and analysis" = "スキャン範囲と分析";
+"Category" = "カテゴリ";
+"Paused" = "一時停止中";

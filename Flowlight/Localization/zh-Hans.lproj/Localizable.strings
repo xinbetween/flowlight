@@ -17,7 +17,6 @@
 "Agent advisories" = "代理安全建议";
 "Software" = "软件";
 "Local agent metadata · bounded, no execution" = "本地代理元数据 · 有界扫描，不执行";
-"Agent security inventory" = "代理安全清单";
 "Scan agent files" = "扫描代理文件";
 "Scan /" = "扫描 /";
 "Scanning accessible agent metadata under /…" = "正在扫描 / 下可访问的代理元数据…";
@@ -57,23 +56,14 @@
 "Recursive home scan · depth %lld · %lld directories · system, generated, hidden, and cache folders skipped." = "递归扫描主文件夹 · 深度 %lld · %lld 个文件夹 · 跳过隐藏、受保护、构建和缓存文件夹。";
 "Home scan is bounded at depth %lld and %lld directories; system, generated, hidden, and cache folders are skipped." = "主文件夹扫描限制为深度 %lld 和 %lld 个文件夹；跳过受保护、隐藏、构建和缓存文件夹。";
 "Scan home folder recursively" = "递归扫描主文件夹";
-"Pause home folder scanning" = "暂停主文件夹扫描";
 "Flowlight reads package metadata locally with bounded depth and directory limits. It skips system, generated, hidden, and cache folders and never executes project code." = "Flowlight 在本地读取包元数据，并限制深度和文件夹数量。它会跳过受保护、隐藏、构建和缓存文件夹，绝不会执行项目代码。";
 "Home folder scan is paused. Re-enable it to inspect package metadata under your home folder." = "主文件夹扫描已暂停。重新启用后即可检查其中的包元数据。";
-"Node packages and lockfiles are read locally under your home folder and any project folders you choose. Flowlight skips system, generated, and cache folders and never executes project code." = "Node 包和锁文件仅在本地主文件夹及你选择的项目文件夹中读取。Flowlight 会跳过受保护和生成的文件夹，绝不会执行项目代码。";
 "This inventory may be incomplete. Only bounded, accessible sources are shown." = "此清单可能不完整。仅显示在限制范围内可访问的来源。";
-"Limited source: %@" = "受限来源：%@";
-"No accessible software was found. Home folder scanning is bounded and can be paused above; choose a project folder for an additional focused scan, or scan again." = "未找到可访问的软件。主文件夹扫描有边界，可在上方暂停；选择项目文件夹进行额外的定向扫描，或再次扫描。";
-"No accessible software was found in standard locations, the home folder, or selected project folders." = "在标准位置、主文件夹或所选项目文件夹中未找到可访问的软件。";
 "Choose an additional project folder. Flowlight also scans bounded package metadata throughout your home folder, while skipping system, generated, and cache folders." = "选择其他项目文件夹。Flowlight 也会在主文件夹中扫描受限的包元数据，同时跳过受保护和生成的文件夹。";
 "Choose an additional folder for bounded local Agent metadata inspection. The folder is not scanned until you explicitly start an Agent advisory scan." = "选择用于有限本地代理元数据检查的其他文件夹。在你明确启动代理建议扫描之前，不会扫描该文件夹。";
 "None selected. The Advisories page also performs a bounded home-folder package scan." = "尚未选择。公告页面也会执行受限的主文件夹包扫描。";
-"Choose an additional bounded project folder; home-folder scanning is controlled on Advisories" = "选择其他受限项目文件夹；主文件夹扫描在公告页面控制";
 "Matching is local and advisory-only. Standard application, executable, Homebrew, and home-folder package locations are bounded; system, generated, and cache folders are skipped. Clearing this data removes the cached catalog and its local matches." = "匹配仅在本地进行，仅用于提示。应用、可执行文件、Homebrew 和主文件夹包的位置均受限；跳过受保护和生成的文件夹。清除数据会删除缓存目录和本地匹配结果。";
-"Inspect project packages" = "检查项目包";
 "Node packages and lockfiles are read only inside folders you choose. Flowlight never crawls your whole home folder." = "Node 包和锁定文件只会在你选择的文件夹中读取。Flowlight 不会扫描整个主文件夹。";
-"No project folder selected yet." = "尚未选择项目文件夹。";
-"Selected project folders: %lld" = "已选择的项目文件夹：%lld";
 "No accessible software was found. Choose a project folder to inspect bounded package metadata, or scan again." = "未找到可访问的软件。请选择项目文件夹以检查有限的包元数据，或再次扫描。";
 "Choose a project folder. Flowlight reads bounded package metadata inside it; it never crawls your whole home folder." = "请选择项目文件夹。Flowlight 只读取其中有限的包元数据，不会扫描整个主文件夹。";
 "Choose a project folder to inspect bounded package metadata" = "选择项目文件夹以检查有限的包元数据";
@@ -2270,3 +2260,19 @@
 "The agent's destination policy was saved, but Flowlight couldn't fully apply it: %@" = "代理的目标地址策略已保存，但 Flowlight 无法完全应用：%@";
 "Updating policy…" = "正在更新策略…";
 "Partly allowed" = "部分允许";
+
+/* Advisories dashboards */
+"Software inventory" = "软件清单";
+"%lld software artifacts" = "%lld 个软件条目";
+"Inventory overview" = "清单概览";
+"Inventory sources and catalog" = "清单来源和目录";
+"Agent Advisories Settings" = "智能体安全通告设置";
+"Software Advisories Settings" = "软件安全通告设置";
+"No accessible software was found. Use Software Advisories Settings to choose a project folder." = "未找到可访问的软件。请在软件安全通告设置中选择项目文件夹。";
+"No findings" = "无发现项";
+"Review scan coverage for the locations and files that were inspected." = "查看扫描覆盖范围，了解已检查的位置和文件。";
+"Try another severity or surface filter." = "请尝试其他严重程度或范围筛选条件。";
+"Scan overview" = "扫描概览";
+"Scan coverage and analysis" = "扫描覆盖范围和分析";
+"Category" = "类别";
+"Paused" = "已暂停";

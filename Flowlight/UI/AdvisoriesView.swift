@@ -7,6 +7,8 @@ struct AdvisoriesView: View {
     @ObservedObject var store: AdvisoryStore
     @ObservedObject var updater: AdvisoryCatalogUpdater
     @EnvironmentObject private var nav: AppNavigation
+    @Binding var settingsTab: AdvisoriesTab?
+    @State private var showsCoverage = false
     @State private var artifacts: [AdvisoryArtifact] = []
     @State private var sources: [AdvisoryInventorySourceResult] = []
     @State private var scanComplete = false
@@ -16,8 +18,8 @@ struct AdvisoriesView: View {
     @State private var probeTotal = 0
     @State private var probeSummary: String?
     @State private var probeStatuses: [String: ExecutableVersionProbe.Status] = [:]
-    @State private var selectedProjectFolderCount = 0
     @State private var homeScanEnabled = AdvisoryInventoryPreferences.homeScanEnabled
+    @State private var projectRoots: [AdvisoryInventoryRoot] = []
     @State private var refreshID = 0
     @State private var probeRunID: UUID?
     @State private var selectedArtifactID: String?
@@ -73,8 +75,8 @@ struct AdvisoriesView: View {
         }
     }
 
-    private var filteredRows: [Row] {
-        allRows.filter { row in
+    private func filteredRows(_ rows: [Row]) -> [Row] {
+        rows.filter { row in
             let kindMatches = kindFilter.matches(row.artifact)
             let statusMatches: Bool
             switch statusFilter {
@@ -90,7 +92,7 @@ struct AdvisoriesView: View {
         Group {
             switch nav.advisoriesTab {
             case .agent:
-                AgentAdvisoriesView()
+                AgentAdvisoriesView(showsSettings: settingsBinding(for: .agent))
             case .software:
                 softwareContent
             }
@@ -100,27 +102,49 @@ struct AdvisoriesView: View {
                             ? L("Local agent metadata · bounded, no execution")
                             : navigationSubtitle)
         .toolbar { toolbar }
+        .onChange(of: nav.advisoriesTab) { _, tab in
+            if settingsTab != tab { settingsTab = nil }
+        }
+    }
+
+    private func settingsBinding(for tab: AdvisoriesTab) -> Binding<Bool> {
+        Binding(get: { settingsTab == tab }, set: { shown in
+            if shown { settingsTab = tab }
+            else if settingsTab == tab { settingsTab = nil }
+        })
     }
 
     private var softwareContent: some View {
-        GeometryReader { geometry in
-            Group {
-                if scanning && artifacts.isEmpty {
+        let rows = allRows
+        return GeometryReader { window in
+            VStack(alignment: .leading, spacing: Spacing.m) {
+                overview(rows)
+                    .fixedSize(horizontal: false, vertical: true)
+                if scanning && rows.isEmpty {
                     loading
-                } else if artifacts.isEmpty {
+                } else if rows.isEmpty {
                     empty
                 } else {
-                    content(height: geometry.size.height)
+                    inventory(rows)
                 }
             }
-            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
+            .padding(Spacing.l)
+            .frame(width: window.size.width, height: window.size.height, alignment: .topLeading)
         }
         .task(id: refreshID) { await scan() }
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification).receive(on: RunLoop.main)) { _ in
+            let updated = AdvisoryInventoryPreferences.selectedProjectRoots
+            if updated != projectRoots {
+                projectRoots = updated
+                refreshID += 1
+            }
+        }
         .task(id: probeRunID) {
             guard let probeRunID else { return }
             await identifyVersions(runID: probeRunID)
         }
         .onDisappear { probeRunID = nil }
+        .sheet(isPresented: settingsBinding(for: .software)) { softwareSettings }
         .sheet(item: selectedBinding) { row in
             AdvisoryDetailView(row: row, catalogState: store.catalogState, catalogReady: store.catalogReady,
                                status: statusTitle(for: row), version: row.artifact.version ?? versionText(for: row))
@@ -153,82 +177,23 @@ struct AdvisoriesView: View {
             .pickerStyle(.segmented)
             .accessibilityIdentifier("advisories.tabs")
         }
-        if nav.advisoriesTab == .software {
-            ToolbarItemGroup {
-                Button { refreshID += 1 } label: {
-                    Label(L("Rescan software"), systemImage: "arrow.clockwise")
-                }
-                .disabled(scanning || probingVersions)
-                .accessibilityIdentifier("advisories.rescan")
-                .help(L("Rescan accessible local software and selected project folders"))
-
-                Button { addProjectFolder() } label: {
-                    Label(L("Add project folder…"), systemImage: "folder.badge.plus")
-                }
-                .disabled(scanning || probingVersions)
-                .accessibilityIdentifier("advisories.add-project-folder")
-                .help(L("Choose a project folder to inspect bounded package metadata"))
-
-                Button { Task { await updater.checkNow() } } label: {
-                    Label(L("Refresh catalog"), systemImage: "arrow.triangle.2.circlepath")
-                }
-                .disabled(updater.status == .checking)
-                .accessibilityIdentifier("advisories.refresh-catalog")
-                .help(L("Check for a newer signed advisory catalog without uploading inventory"))
-            }
-        }
     }
 
-    private func content(height: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.m) {
-            catalogContext
-            homeScanScope
-            inventorySources
-            if artifacts.allSatisfy({ !$0.kind.isPackage }) {
-                projectFolderGuidance
-            }
-            versionProbeCard
-            summary
-            HStack(spacing: Spacing.s) {
-                Picker(L("Status"), selection: $statusFilter) {
-                    ForEach(StatusFilter.allCases) { value in Text(value.title).tag(value) }
+    private func inventory(_ rows: [Row]) -> some View {
+        let filtered = filteredRows(rows)
+        return VStack(alignment: .leading, spacing: Spacing.s) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Spacing.m) {
+                    inventoryTitle(rows.count)
+                    Spacer(minLength: 0)
+                    filters
                 }
-                .pickerStyle(.segmented)
-                .accessibilityIdentifier("advisories.filter")
-                Picker(L("Kind"), selection: $kindFilter) {
-                    ForEach(KindFilter.allCases) { value in Text(value.title).tag(value) }
+                VStack(alignment: .leading, spacing: Spacing.s) {
+                    inventoryTitle(rows.count)
+                    filters
                 }
-                .frame(width: 180)
-                .accessibilityIdentifier("advisories.kind-filter")
-                Spacer(minLength: 0)
-                Text(inventorySummary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("advisories.inventory")
             }
-
-            Divider()
-
-            if !scanComplete || sources.contains(where: { !$0.complete }) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label(L("This inventory may be incomplete. Only bounded, accessible sources are shown."),
-                          systemImage: "exclamationmark.triangle")
-                    ForEach(sources.filter { !$0.complete }, id: \.source) { source in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(L("Limited source: %@", source.source))
-                            if let detail = source.detail { Text(detail) }
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                }
-                .font(.callout)
-                .foregroundStyle(FL.warning)
-                .padding(.horizontal, Spacing.s)
-                .accessibilityIdentifier("advisories.incomplete")
-            }
-
-            if filteredRows.isEmpty {
+            if filtered.isEmpty {
                 ContentUnavailableView {
                     Label(L("No software matches this filter"), systemImage: "line.3.horizontal.decrease.circle")
                 } description: {
@@ -237,182 +202,211 @@ struct AdvisoriesView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityIdentifier("advisories.filtered-empty")
             } else {
-                table.frame(height: max(180, height - 250), alignment: .top)
+                GeometryReader { viewport in
+                    table(filtered)
+                        .frame(width: viewport.size.width, height: viewport.size.height)
+                }
             }
         }
-        .padding()
+    }
+
+    private func inventoryTitle(_ count: Int) -> some View {
+        Text(L("Software inventory"))
+            .font(.headline)
+            .fixedSize()
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityValue(L("%lld software artifacts", count))
+            .accessibilityIdentifier("advisories.inventory")
+    }
+
+    private var filters: some View {
+        HStack(spacing: Spacing.m) {
+            Picker(L("Status"), selection: $statusFilter) {
+                ForEach(StatusFilter.allCases) { value in Text(value.title).tag(value) }
+            }
+            .pickerStyle(.segmented)
+            .fixedSize()
+            .accessibilityIdentifier("advisories.filter")
+            Picker(L("Kind"), selection: $kindFilter) {
+                ForEach(KindFilter.allCases) { value in Text(value.title).tag(value) }
+            }
+            .fixedSize()
+            .accessibilityIdentifier("advisories.kind-filter")
+        }
+    }
+
+    private var softwareSettings: some View {
+        AdvisorySettingsSheet(title: AdvisoriesTab.software.settingsTitle, identifier: "advisories.software.settings") {
+            Form {
+                Section {
+                    homeScanScope
+                } header: {
+                    Text(L("Home folder scan"))
+                }
+                AdvisoryCatalogSettingsSection(updater: updater, foldersDisabled: scanning || probingVersions)
+                Section {
+                    versionProbeCard
+                } header: {
+                    Text(L("Identify executable versions"))
+                }
+            }
+            .formStyle(.grouped)
+        }
+    }
+
+    private func overview(_ rows: [Row]) -> some View {
+        let affected = rows.filter(\.isAffected).count
+        let needsReview = rows.filter { $0.isUnknown || !store.catalogReady }.count
+        let limited = !scanComplete || sources.contains { !$0.complete }
+        return VStack(alignment: .leading, spacing: Spacing.s) {
+            HStack(spacing: Spacing.m) {
+                Text(L("Inventory overview"))
+                    .font(.title3.weight(.semibold))
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 0)
+                if scanning {
+                    ProgressView().controlSize(.small).accessibilityHidden(true)
+                    Text(L("Scanning bounded local software sources…"))
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Button { refreshID += 1 } label: {
+                        Label(L("Rescan software"), systemImage: "arrow.clockwise")
+                    }
+                    .disabled(probingVersions)
+                    .accessibilityIdentifier("advisories.rescan")
+                    .help(L("Rescan accessible local software and selected project folders"))
+                }
+            }
+            if !rows.isEmpty {
+                HStack(spacing: Spacing.m) {
+                    AdvisoryOverviewMetric(title: L("Software"), value: rows.count)
+                    Divider().frame(height: 32)
+                    AdvisoryOverviewMetric(title: L("Affected"), value: affected,
+                                           icon: affected > 0 ? "exclamationmark.triangle.fill" : nil, tint: FL.critical)
+                    Divider().frame(height: 32)
+                    AdvisoryOverviewMetric(title: L("Needs review"), value: needsReview,
+                                           icon: needsReview > 0 ? "questionmark.circle" : nil, tint: FL.warning)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            Divider()
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                AdvisoryStatusLine(title: catalogTitle,
+                                   systemImage: store.catalogReady ? "checkmark.shield" : "exclamationmark.triangle",
+                                   tint: store.catalogReady ? FL.good : FL.warning)
+                    .accessibilityIdentifier("advisories.catalog")
+                if updater.status != .idle && updater.status != .current {
+                    AdvisoryStatusLine(title: updater.advisoryStatusTitle, systemImage: "arrow.triangle.2.circlepath",
+                                       tint: updater.status == .checking ? .secondary : FL.warning)
+                }
+                if !homeScanEnabled {
+                    AdvisoryStatusLine(title: L("Home folder scan is paused. Re-enable it to inspect package metadata under your home folder."),
+                                       systemImage: "pause.circle", tint: FL.warning)
+                }
+                if limited && (!scanning || !rows.isEmpty) {
+                    AdvisoryStatusLine(title: L("This inventory may be incomplete. Only bounded, accessible sources are shown."),
+                                       systemImage: "exclamationmark.triangle", tint: FL.warning)
+                        .accessibilityIdentifier("advisories.incomplete")
+                }
+            }
+            if probingVersions {
+                versionProbeProgress
+            }
+            AdvisoryOverviewDisclosure(title: L("Inventory sources and catalog"), expanded: $showsCoverage,
+                                       identifier: "advisories.coverage.disclosure") {
+                VStack(alignment: .leading, spacing: Spacing.m) {
+                    if !sources.isEmpty { inventorySources }
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        Text(catalogTitle).font(.callout.weight(.semibold))
+                        ForEach(catalogDetails, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
+                    }
+                    if let probeSummary {
+                        Text(probeSummary).font(.caption).foregroundStyle(.secondary)
+                            .accessibilityIdentifier("advisories.version-probe.summary")
+                    }
+                }
+            }
+        }
+        .padding(Spacing.m)
+        .flCard(radius: Radius.chip)
     }
 
     private var versionProbeCard: some View {
         let eligible = artifacts.filter { ExecutableVersionProbe.isEligible($0) }.count
         return VStack(alignment: .leading, spacing: Spacing.s) {
-            HStack(alignment: .top, spacing: Spacing.s) {
-                Image(systemName: "terminal").foregroundStyle(FL.accent).frame(width: 20)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(L("Identify executable versions")).font(.callout.weight(.medium))
-                    Text(L("Runs bounded local version checks for supported executables; inventory never leaves this Mac."))
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: Spacing.s)
-                if probingVersions {
-                    Button(L("Stop")) { probeRunID = nil }
-                        .buttonStyle(.bordered)
-                        .accessibilityIdentifier("advisories.version-probe.stop")
-                } else {
-                    Button(L("Scan now")) { probeRunID = UUID() }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(scanning || eligible == 0)
-                        .accessibilityIdentifier("advisories.version-probe.start")
-                }
-            }
+            Text(L("Runs bounded local version checks for supported executables; inventory never leaves this Mac."))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             if probingVersions {
-                ProgressView(value: Double(probeProgress), total: Double(max(probeTotal, 1)))
-                    .accessibilityIdentifier("advisories.version-probe.progress")
-                Text(L("Checked %lld of %lld supported executables", probeProgress, probeTotal))
-                    .font(.caption).foregroundStyle(.secondary)
-            } else if let probeSummary {
-                Text(probeSummary)
-                    .font(.caption).foregroundStyle(.secondary)
-                    .accessibilityIdentifier("advisories.version-probe.summary")
+                versionProbeProgress
             } else {
-                Text(L("%lld supported executable%@ found. Version checks are explicit and time-limited.", eligible, eligible == 1 ? "" : "s"))
+                Text(probeSummary ?? L("%lld supported executable%@ found. Version checks are explicit and time-limited.",
+                                       eligible, eligible == 1 ? "" : "s"))
                     .font(.caption).foregroundStyle(.secondary)
+                Button(L("Scan now")) { probeRunID = UUID() }
+                    .disabled(scanning || eligible == 0)
+                    .accessibilityIdentifier("advisories.version-probe.start")
             }
         }
-        .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.s)
-        .flCard(radius: Radius.chip)
-        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("advisories.version-probe")
     }
 
+    private var versionProbeProgress: some View {
+        HStack(spacing: Spacing.s) {
+            ProgressView(value: Double(probeProgress), total: Double(max(probeTotal, 1)))
+                .accessibilityIdentifier("advisories.version-probe.progress")
+            Text(L("Checked %lld of %lld supported executables", probeProgress, probeTotal))
+                .font(.caption).foregroundStyle(.secondary)
+            Button(L("Stop")) { probeRunID = nil }
+                .accessibilityIdentifier("advisories.version-probe.stop")
+        }
+    }
+
     private var inventorySources: some View {
-        VStack(alignment: .leading, spacing: Spacing.xs) {
-            Text(L("Inventory sources"))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            Text(L("Inventory sources")).font(.callout.weight(.semibold))
             ForEach(sources, id: \.source) { source in
-                HStack(spacing: Spacing.s) {
-                    Image(systemName: source.complete ? "checkmark.circle" : "exclamationmark.triangle")
-                        .foregroundStyle(source.complete ? FL.good : FL.warning)
-                    Text(source.source)
-                        .lineLimit(1)
-                    Spacer(minLength: Spacing.s)
-                    Text(L("%lld found", source.discovered))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(source.complete ? L("Complete") : L("Limited"))
-                        .font(.caption)
-                        .foregroundStyle(source.complete ? FL.good : FL.warning)
+                let paused = !homeScanEnabled && source.source == L("Home folder")
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    HStack(spacing: Spacing.s) {
+                        Image(systemName: paused ? "pause.circle" : source.complete ? "checkmark.circle" : "exclamationmark.triangle")
+                            .foregroundStyle(source.complete && !paused ? FL.good : FL.warning)
+                            .accessibilityHidden(true)
+                        Text(source.source)
+                        Spacer(minLength: Spacing.s)
+                        Text(L("%lld found", source.discovered)).foregroundStyle(.secondary)
+                        Text(paused ? L("Paused") : source.complete ? L("Complete") : L("Limited"))
+                    }
+                    if let detail = source.detail {
+                        Text(detail).foregroundStyle(.secondary)
+                    }
                 }
+                .font(.caption)
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("advisories.source.\(source.source)")
             }
         }
-        .padding(.horizontal, Spacing.m)
-        .padding(.vertical, Spacing.s)
-        .flCard(radius: Radius.chip)
         .accessibilityIdentifier("advisories.sources")
     }
 
     private var homeScanScope: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
-            HStack(alignment: .firstTextBaseline, spacing: Spacing.s) {
-                Label(L("Home folder scan"), systemImage: "house.fill")
-                    .font(.callout.weight(.medium))
-                Spacer(minLength: Spacing.s)
-                Toggle(L("Scan home folder recursively"), isOn: $homeScanEnabled)
-                    .toggleStyle(.switch)
-                    .labelsHidden()
-                    .accessibilityLabel(homeScanEnabled ? L("Pause home folder scanning") : L("Scan home folder recursively"))
-                    .accessibilityIdentifier("advisories.home-scan.toggle")
-                    .onChange(of: homeScanEnabled) { _, enabled in
-                        AdvisoryInventoryPreferences.setHomeScanEnabled(enabled)
-                        refreshID += 1
-                    }
-            }
+            Toggle(L("Scan home folder recursively"), isOn: $homeScanEnabled)
+                .toggleStyle(.switch)
+                .disabled(scanning || probingVersions)
+                .accessibilityIdentifier("advisories.home-scan.toggle")
+                .onChange(of: homeScanEnabled) { _, enabled in
+                    AdvisoryInventoryPreferences.setHomeScanEnabled(enabled)
+                    refreshID += 1
+                }
             Text(homeScanEnabled
                  ? L("Flowlight reads package metadata locally with bounded depth and directory limits. It skips system, generated, hidden, and cache folders and never executes project code.")
                  : L("Home folder scan is paused. Re-enable it to inspect package metadata under your home folder."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            if let source = sources.first(where: { $0.source == L("Home folder") }), let detail = source.detail {
-                Text(detail)
-                    .font(.caption2)
-                    .foregroundStyle(source.complete ? .secondary : FL.warning)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
         }
-        .padding(Spacing.m)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .flCard(radius: Radius.chip)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("advisories.home-scan.scope")
-    }
-
-    private var projectFolderGuidance: some View {
-        VStack(alignment: .leading, spacing: Spacing.s) {
-            Label(L("Inspect project packages"), systemImage: "shippingbox.fill")
-                .font(.callout.weight(.medium))
-            Text(L("Node packages and lockfiles are read locally under your home folder and any project folders you choose. Flowlight skips system, generated, and cache folders and never executes project code."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if selectedProjectFolderCount == 0 {
-                Text(L("No project folder selected yet."))
-                    .font(.caption)
-                    .foregroundStyle(FL.warning)
-            } else {
-                Text(L("Selected project folders: %lld", selectedProjectFolderCount))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            HStack(spacing: Spacing.s) {
-                Button(L("Add project folder…")) { addProjectFolder() }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(scanning || probingVersions)
-                    .accessibilityIdentifier("advisories.add-project-folder.guidance")
-                Button(L("Rescan software")) { refreshID += 1 }
-                    .buttonStyle(.bordered)
-                    .disabled(scanning || probingVersions)
-                    .accessibilityIdentifier("advisories.guidance.rescan")
-            }
-        }
-        .padding(Spacing.m)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .flCard(radius: Radius.chip)
-        .accessibilityIdentifier("advisories.project-folder-guidance")
-    }
-
-    private var catalogContext: some View {
-        FLContextRow(
-            title: catalogTitle,
-            details: catalogDetails,
-            systemImage: store.catalogReady ? "checkmark.shield" : "questionmark.shield",
-            tint: store.catalogReady ? FL.good : FL.warning,
-            identifier: "advisories.catalog"
-        )
-    }
-
-    private var summary: some View {
-        let affected = allRows.filter(\.isAffected).count
-        let needsReview = allRows.filter { $0.isUnknown || !store.catalogReady }.count
-        let catalogValue: String = {
-            if !store.catalogReady { return L("Review") }
-            if let sequence = store.catalogState?.receipt?.sequence { return "#\(sequence)" }
-            return L("Ready")
-        }()
-        return HStack(spacing: Spacing.s) {
-            StatTile(title: L("Software"), value: "\(allRows.count)", systemImage: "square.stack.3d.up")
-            StatTile(title: L("Affected"), value: "\(affected)", systemImage: "exclamationmark.triangle",
-                     tint: affected > 0 ? FL.critical : .secondary)
-            StatTile(title: L("Needs review"), value: "\(needsReview)", systemImage: "questionmark.circle",
-                     tint: needsReview > 0 ? FL.warning : .secondary)
-            StatTile(title: L("Catalog"), value: catalogValue, systemImage: "checkmark.shield",
-                     tint: store.catalogReady ? FL.good : FL.warning)
-        }
-        .accessibilityElement(children: .contain)
     }
 
     private var catalogTitle: String {
@@ -433,47 +427,28 @@ struct AdvisoriesView: View {
         return details
     }
 
-    private var inventorySummary: String {
-        let affected = allRows.filter(\.isAffected).count
-        return L("%lld software artifacts · %lld affected", allRows.count, affected)
-    }
-
     private var loading: some View {
-        VStack(spacing: Spacing.m) {
-            ProgressView()
-            Text(L("Scanning bounded local software sources…")).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityIdentifier("advisories.loading")
+        ProgressView()
+            .accessibilityLabel(L("Scanning bounded local software sources…"))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityIdentifier("advisories.loading")
     }
 
     private var empty: some View {
-        VStack(spacing: Spacing.m) {
-            homeScanScope
-            ContentUnavailableView {
-                Label(L("No software found"), systemImage: "square.stack.3d.up")
-            } description: {
-                Text(scanComplete
-                     ? (selectedProjectFolderCount == 0
-                        ? L("No accessible software was found. Home folder scanning is bounded and can be paused above; choose a project folder for an additional focused scan, or scan again.")
-                        : L("No accessible software was found in standard locations, the home folder, or selected project folders."))
-                     : L("The local software inventory is incomplete or unavailable."))
-            } actions: {
-                VStack(spacing: Spacing.s) {
-                    Button(L("Scan again")) { refreshID += 1 }
-                        .accessibilityIdentifier("advisories.empty.rescan")
-                    Button(L("Add project folder…")) { addProjectFolder() }
-                        .buttonStyle(.borderedProminent)
-                        .accessibilityIdentifier("advisories.empty.add-project-folder")
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ContentUnavailableView {
+            Label(L("No software found"), systemImage: "square.stack.3d.up")
+        } description: {
+            Text(scanComplete
+                 ? L("No accessible software was found. Use Software Advisories Settings to choose a project folder.")
+                 : L("The local software inventory is incomplete or unavailable."))
+        } actions: {
+            Button(AdvisoriesTab.software.settingsTitle) { settingsTab = .software }
         }
-        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityIdentifier("advisories.empty")
     }
 
-    private var table: some View {
+    private func table(_ filteredRows: [Row]) -> some View {
         Table(filteredRows.sorted(using: sortOrder), selection: $selectedArtifactID, sortOrder: $sortOrder) {
             TableColumn(L("Software"), value: \.artifact.name) { row in
                 HStack(spacing: Spacing.s) {
@@ -614,7 +589,7 @@ struct AdvisoriesView: View {
     private func scan() async {
         scanning = true
         probeRunID = nil
-        selectedProjectFolderCount = AdvisoryInventoryPreferences.selectedProjectRoots.count
+        projectRoots = AdvisoryInventoryPreferences.selectedProjectRoots
         let result = await Task.detached(priority: .utility) {
             AdvisoryInventoryScanner().scan()
         }.value
@@ -628,21 +603,6 @@ struct AdvisoriesView: View {
         probeStatuses = [:]
         probeSummary = nil
         scanning = false
-    }
-
-    @MainActor
-    private func addProjectFolder() {
-        guard let root = AdvisoryProjectFolderPicker.choose() else { return }
-        var roots = AdvisoryInventoryPreferences.selectedProjectRoots
-        guard !roots.contains(where: { $0.id == root.id }) else {
-            selectedProjectFolderCount = roots.count
-            return
-        }
-        roots.append(root)
-        roots.sort { $0.path.localizedCaseInsensitiveCompare($1.path) == .orderedAscending }
-        AdvisoryInventoryPreferences.saveSelectedProjectRoots(roots)
-        selectedProjectFolderCount = roots.count
-        refreshID += 1
     }
 
     private func identifyVersions(runID: UUID) async {
@@ -682,6 +642,111 @@ struct AdvisoriesView: View {
         } else {
             probeSummary = L("Identified %lld of %lld executable versions.", found, candidates.count)
         }
+    }
+}
+
+extension AdvisoriesTab {
+    @MainActor var settingsTitle: String {
+        switch self {
+        case .agent: return L("Agent Advisories Settings")
+        case .software: return L("Software Advisories Settings")
+        }
+    }
+}
+
+struct AdvisorySettingsSheet<Content: View>: View {
+    let title: String
+    let identifier: String
+    @ViewBuilder let content: Content
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Label(title, systemImage: "gearshape")
+                .font(.title2.weight(.semibold))
+                .accessibilityAddTraits(.isHeader)
+                .padding(Spacing.l)
+            Divider()
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Divider()
+            HStack {
+                Spacer()
+                Button(L("Done")) { dismiss() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(.horizontal, Spacing.l)
+            .padding(.vertical, Spacing.m)
+        }
+        .frame(width: 540, height: 460)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(identifier)
+    }
+}
+
+struct AdvisoryOverviewMetric: View {
+    let title: String
+    let value: Int
+    var icon: String? = nil
+    var tint: Color = .secondary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: Spacing.xs) {
+                Text(value.formatted()).font(.title2.weight(.semibold))
+                if let icon {
+                    Image(systemName: icon).font(.caption).foregroundStyle(tint)
+                        .accessibilityHidden(true)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+struct AdvisoryStatusLine: View {
+    let title: String
+    let systemImage: String
+    let tint: Color
+
+    var body: some View {
+        Label {
+            Text(title)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: systemImage)
+                .foregroundStyle(tint)
+                .accessibilityHidden(true)
+        }
+        .font(.caption)
+    }
+}
+
+struct AdvisoryOverviewDisclosure<Details: View>: View {
+    let title: String
+    @Binding var expanded: Bool
+    let identifier: String
+    @ViewBuilder let details: Details
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $expanded) {
+            ScrollView { detailBody }
+                .frame(height: 112)
+        } label: {
+            Text(title).font(.caption.weight(.medium))
+        }
+        .accessibilityIdentifier(identifier)
+    }
+
+    private var detailBody: some View {
+        details
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, Spacing.s)
     }
 }
 

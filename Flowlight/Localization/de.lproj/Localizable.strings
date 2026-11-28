@@ -17,7 +17,6 @@
 "Agent advisories" = "Agent-Sicherheitshinweise";
 "Software" = "Software";
 "Local agent metadata · bounded, no execution" = "Lokale Agent-Metadaten · begrenzt, keine Ausführung";
-"Agent security inventory" = "Agent-Sicherheitsinventar";
 "Scan agent files" = "Agent-Dateien scannen";
 "Scan /" = "/ scannen";
 "Scanning accessible agent metadata under /…" = "Zugängliche Agent-Metadaten unter / werden gescannt …";
@@ -57,23 +56,14 @@
 "Recursive home scan · depth %lld · %lld directories · system, generated, hidden, and cache folders skipped." = "Rekursiver Scan des Benutzerordners · Tiefe %lld · %lld Ordner · versteckte, geschützte, Build- und Cache-Ordner übersprungen.";
 "Home scan is bounded at depth %lld and %lld directories; system, generated, hidden, and cache folders are skipped." = "Der Scan des Benutzerordners ist auf Tiefe %lld und %lld Ordner begrenzt; geschützte, versteckte, Build- und Cache-Ordner werden übersprungen.";
 "Scan home folder recursively" = "Benutzerordner rekursiv scannen";
-"Pause home folder scanning" = "Scan des Benutzerordners pausieren";
 "Flowlight reads package metadata locally with bounded depth and directory limits. It skips system, generated, hidden, and cache folders and never executes project code." = "Flowlight liest Paketmetadaten lokal mit begrenzten Tiefen- und Ordnerlimits. Geschützte, versteckte, Build- und Cache-Ordner werden übersprungen; Projektcode wird nie ausgeführt.";
 "Home folder scan is paused. Re-enable it to inspect package metadata under your home folder." = "Der Scan des Benutzerordners ist pausiert. Aktivieren Sie ihn erneut, um Paketmetadaten darin zu prüfen.";
-"Node packages and lockfiles are read locally under your home folder and any project folders you choose. Flowlight skips system, generated, and cache folders and never executes project code." = "Node-Pakete und Sperrdateien werden lokal im Benutzerordner und in ausgewählten Projektordnern gelesen. Geschützte und generierte Ordner werden übersprungen; Projektcode wird nie ausgeführt.";
 "This inventory may be incomplete. Only bounded, accessible sources are shown." = "Dieses Inventar ist möglicherweise unvollständig. Nur begrenzte, zugängliche Quellen werden angezeigt.";
-"Limited source: %@" = "Eingeschränkte Quelle: %@";
-"No accessible software was found. Home folder scanning is bounded and can be paused above; choose a project folder for an additional focused scan, or scan again." = "Keine zugängliche Software gefunden. Der Scan des Benutzerordners ist begrenzt und kann oben pausiert werden; wählen Sie einen Projektordner für einen zusätzlichen fokussierten Scan oder scannen Sie erneut.";
-"No accessible software was found in standard locations, the home folder, or selected project folders." = "Keine zugängliche Software in Standardorten, im Benutzerordner oder in ausgewählten Projektordnern gefunden.";
 "Choose an additional project folder. Flowlight also scans bounded package metadata throughout your home folder, while skipping system, generated, and cache folders." = "Wählen Sie einen zusätzlichen Projektordner. Flowlight scannt auch begrenzte Paketmetadaten im Benutzerordner und überspringt geschützte und generierte Ordner.";
 "Choose an additional folder for bounded local Agent metadata inspection. The folder is not scanned until you explicitly start an Agent advisory scan." = "Wählen Sie einen zusätzlichen Ordner für eine begrenzte lokale Prüfung von Agent-Metadaten. Der Ordner wird erst nach dem expliziten Start eines Agent-Scans gescannt.";
 "None selected. The Advisories page also performs a bounded home-folder package scan." = "Keine ausgewählt. Die Seite Hinweise führt außerdem einen begrenzten Paket-Scan des Benutzerordners durch.";
-"Choose an additional bounded project folder; home-folder scanning is controlled on Advisories" = "Zusätzlichen begrenzten Projektordner auswählen; der Scan des Benutzerordners wird unter Hinweise gesteuert";
 "Matching is local and advisory-only. Standard application, executable, Homebrew, and home-folder package locations are bounded; system, generated, and cache folders are skipped. Clearing this data removes the cached catalog and its local matches." = "Der Abgleich ist lokal und dient nur Hinweisen. Standardorte für Apps, ausführbare Dateien, Homebrew und Pakete im Benutzerordner sind begrenzt; geschützte und generierte Ordner werden übersprungen. Beim Löschen werden Katalog und lokale Treffer entfernt.";
-"Inspect project packages" = "Projektpakete prüfen";
 "Node packages and lockfiles are read only inside folders you choose. Flowlight never crawls your whole home folder." = "Node-Pakete und Sperrdateien werden nur in von Ihnen ausgewählten Ordnern gelesen. Flowlight durchsucht niemals den gesamten Benutzerordner.";
-"No project folder selected yet." = "Noch kein Projektordner ausgewählt.";
-"Selected project folders: %lld" = "Ausgewählte Projektordner: %lld";
 "No accessible software was found. Choose a project folder to inspect bounded package metadata, or scan again." = "Keine zugängliche Software gefunden. Wählen Sie einen Projektordner, um begrenzte Paketmetadaten zu prüfen, oder scannen Sie erneut.";
 "Choose a project folder. Flowlight reads bounded package metadata inside it; it never crawls your whole home folder." = "Wählen Sie einen Projektordner. Flowlight liest darin begrenzte Paketmetadaten; der gesamte Benutzerordner wird niemals durchsucht.";
 "Choose a project folder to inspect bounded package metadata" = "Projektordner auswählen, um begrenzte Paketmetadaten zu prüfen";
@@ -2271,3 +2261,19 @@
 "The agent's destination policy was saved, but Flowlight couldn't fully apply it: %@" = "Die Zielrichtlinie des Agenten wurde gespeichert, konnte aber von Flowlight nicht vollständig angewendet werden: %@";
 "Updating policy…" = "Richtlinie wird aktualisiert…";
 "Partly allowed" = "Teilweise erlaubt";
+
+/* Advisories dashboards */
+"Software inventory" = "Softwarebestand";
+"%lld software artifacts" = "%lld Softwareeinträge";
+"Inventory overview" = "Bestandsübersicht";
+"Inventory sources and catalog" = "Bestandsquellen und Katalog";
+"Agent Advisories Settings" = "Einstellungen für Agentenhinweise";
+"Software Advisories Settings" = "Einstellungen für Softwarehinweise";
+"No accessible software was found. Use Software Advisories Settings to choose a project folder." = "Keine zugängliche Software gefunden. Wähle in den Einstellungen für Softwarehinweise einen Projektordner aus.";
+"No findings" = "Keine Funde";
+"Review scan coverage for the locations and files that were inspected." = "Der Scanumfang zeigt, welche Ordner und Dateien geprüft wurden.";
+"Try another severity or surface filter." = "Wähle einen anderen Schweregrad- oder Bereichsfilter.";
+"Scan overview" = "Scanübersicht";
+"Scan coverage and analysis" = "Scanumfang und Analyse";
+"Category" = "Kategorie";
+"Paused" = "Pausiert";

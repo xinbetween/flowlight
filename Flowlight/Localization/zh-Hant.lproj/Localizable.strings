@@ -17,7 +17,6 @@
 "Agent advisories" = "代理安全建議";
 "Software" = "軟體";
 "Local agent metadata · bounded, no execution" = "本機代理中繼資料 · 有界掃描，不執行";
-"Agent security inventory" = "代理安全清單";
 "Scan agent files" = "掃描代理檔案";
 "Scan /" = "掃描 /";
 "Scanning accessible agent metadata under /…" = "正在掃描 / 下可存取的代理中繼資料…";
@@ -57,23 +56,14 @@
 "Recursive home scan · depth %lld · %lld directories · system, generated, hidden, and cache folders skipped." = "遞迴掃描主資料夾 · 深度 %lld · %lld 個資料夾 · 略過隱藏、受保護、建置和快取資料夾。";
 "Home scan is bounded at depth %lld and %lld directories; system, generated, hidden, and cache folders are skipped." = "主資料夾掃描限制為深度 %lld 和 %lld 個資料夾；略過受保護、隱藏、建置和快取資料夾。";
 "Scan home folder recursively" = "遞迴掃描主資料夾";
-"Pause home folder scanning" = "暫停主資料夾掃描";
 "Flowlight reads package metadata locally with bounded depth and directory limits. It skips system, generated, hidden, and cache folders and never executes project code." = "Flowlight 在本機讀取套件中繼資料，並限制深度和資料夾數量。它會略過受保護、隱藏、建置和快取資料夾，絕不執行專案程式碼。";
 "Home folder scan is paused. Re-enable it to inspect package metadata under your home folder." = "主資料夾掃描已暫停。重新啟用即可檢查其中的套件中繼資料。";
-"Node packages and lockfiles are read locally under your home folder and any project folders you choose. Flowlight skips system, generated, and cache folders and never executes project code." = "Node 套件和鎖定檔只會在本地主資料夾及你選擇的專案資料夾中讀取。Flowlight 會略過受保護和產生的資料夾，絕不執行專案程式碼。";
 "This inventory may be incomplete. Only bounded, accessible sources are shown." = "此清單可能不完整。只顯示限制範圍內可存取的來源。";
-"Limited source: %@" = "受限來源：%@";
-"No accessible software was found. Home folder scanning is bounded and can be paused above; choose a project folder for an additional focused scan, or scan again." = "找不到可存取的軟體。主資料夾掃描有界限，可在上方暫停；選擇專案資料夾進行額外的集中掃描，或再次掃描。";
-"No accessible software was found in standard locations, the home folder, or selected project folders." = "在標準位置、主資料夾或選取的專案資料夾中找不到可存取的軟體。";
 "Choose an additional project folder. Flowlight also scans bounded package metadata throughout your home folder, while skipping system, generated, and cache folders." = "選擇其他專案資料夾。Flowlight 也會在主資料夾掃描受限的套件中繼資料，同時略過受保護和產生的資料夾。";
 "Choose an additional folder for bounded local Agent metadata inspection. The folder is not scanned until you explicitly start an Agent advisory scan." = "選擇用於有限本機代理中繼資料檢查的其他資料夾。在你明確開始代理建議掃描前，不會掃描該資料夾。";
 "None selected. The Advisories page also performs a bounded home-folder package scan." = "尚未選取。公告頁面也會執行受限的主資料夾套件掃描。";
-"Choose an additional bounded project folder; home-folder scanning is controlled on Advisories" = "選擇其他受限專案資料夾；主資料夾掃描在公告頁面控制";
 "Matching is local and advisory-only. Standard application, executable, Homebrew, and home-folder package locations are bounded; system, generated, and cache folders are skipped. Clearing this data removes the cached catalog and its local matches." = "比對只在本機進行，僅供提示。應用程式、可執行檔、Homebrew 和主資料夾套件位置均受限；略過受保護和產生的資料夾。清除資料會移除快取目錄和本機比對結果。";
-"Inspect project packages" = "檢查專案套件";
 "Node packages and lockfiles are read only inside folders you choose. Flowlight never crawls your whole home folder." = "Node 套件與鎖定檔只會在您選擇的資料夾中讀取。Flowlight 不會掃描整個家目錄。";
-"No project folder selected yet." = "尚未選取專案資料夾。";
-"Selected project folders: %lld" = "已選取的專案資料夾：%lld";
 "No accessible software was found. Choose a project folder to inspect bounded package metadata, or scan again." = "找不到可存取的軟體。請選擇專案資料夾以檢查有限的套件中繼資料，或再次掃描。";
 "Choose a project folder. Flowlight reads bounded package metadata inside it; it never crawls your whole home folder." = "請選擇專案資料夾。Flowlight 只會讀取其中有限的套件中繼資料，不會掃描整個家目錄。";
 "Choose a project folder to inspect bounded package metadata" = "選擇專案資料夾以檢查有限的套件中繼資料";
@@ -2270,3 +2260,19 @@
 "The agent's destination policy was saved, but Flowlight couldn't fully apply it: %@" = "代理的目的地政策已儲存，但 Flowlight 無法完整套用：%@";
 "Updating policy…" = "正在更新政策…";
 "Partly allowed" = "部分允許";
+
+/* Advisories dashboards */
+"Software inventory" = "軟體清單";
+"%lld software artifacts" = "%lld 個軟體項目";
+"Inventory overview" = "清單概覽";
+"Inventory sources and catalog" = "清單來源與目錄";
+"Agent Advisories Settings" = "代理程式安全公告設定";
+"Software Advisories Settings" = "軟體安全公告設定";
+"No accessible software was found. Use Software Advisories Settings to choose a project folder." = "找不到可存取的軟體。請在軟體安全公告設定中選擇專案資料夾。";
+"No findings" = "沒有發現項目";
+"Review scan coverage for the locations and files that were inspected." = "查看掃描涵蓋範圍，瞭解已檢查的位置及檔案。";
+"Try another severity or surface filter." = "請試用其他嚴重程度或範圍篩選條件。";
+"Scan overview" = "掃描概覽";
+"Scan coverage and analysis" = "掃描涵蓋範圍與分析";
+"Category" = "類別";
+"Paused" = "已暫停";

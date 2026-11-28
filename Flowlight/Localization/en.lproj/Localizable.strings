@@ -19,7 +19,6 @@
 "Agent advisories" = "Agent advisories";
 "Software" = "Software";
 "Local agent metadata · bounded, no execution" = "Local agent metadata · bounded, no execution";
-"Agent security inventory" = "Agent security inventory";
 "Scan agent files" = "Scan agent files";
 "Scan /" = "Scan /";
 "Scanning accessible agent metadata under /…" = "Scanning accessible agent metadata under /…";
@@ -59,23 +58,14 @@
 "Recursive home scan · depth %lld · %lld directories · system, generated, hidden, and cache folders skipped." = "Recursive home scan · depth %lld · %lld directories · system, generated, hidden, and cache folders skipped.";
 "Home scan is bounded at depth %lld and %lld directories; system, generated, hidden, and cache folders are skipped." = "Home scan is bounded at depth %lld and %lld directories; system, generated, hidden, and cache folders are skipped.";
 "Scan home folder recursively" = "Scan home folder recursively";
-"Pause home folder scanning" = "Pause home folder scanning";
 "Flowlight reads package metadata locally with bounded depth and directory limits. It skips system, generated, hidden, and cache folders and never executes project code." = "Flowlight reads package metadata locally with bounded depth and directory limits. It skips system, generated, hidden, and cache folders and never executes project code.";
 "Home folder scan is paused. Re-enable it to inspect package metadata under your home folder." = "Home folder scan is paused. Re-enable it to inspect package metadata under your home folder.";
-"Node packages and lockfiles are read locally under your home folder and any project folders you choose. Flowlight skips system, generated, and cache folders and never executes project code." = "Node packages and lockfiles are read locally under your home folder and any project folders you choose. Flowlight skips system, generated, and cache folders and never executes project code.";
 "This inventory may be incomplete. Only bounded, accessible sources are shown." = "This inventory may be incomplete. Only bounded, accessible sources are shown.";
-"Limited source: %@" = "Limited source: %@";
-"No accessible software was found. Home folder scanning is bounded and can be paused above; choose a project folder for an additional focused scan, or scan again." = "No accessible software was found. Home folder scanning is bounded and can be paused above; choose a project folder for an additional focused scan, or scan again.";
-"No accessible software was found in standard locations, the home folder, or selected project folders." = "No accessible software was found in standard locations, the home folder, or selected project folders.";
 "Choose an additional project folder. Flowlight also scans bounded package metadata throughout your home folder, while skipping system, generated, and cache folders." = "Choose an additional project folder. Flowlight also scans bounded package metadata throughout your home folder, while skipping system, generated, and cache folders.";
 "Choose an additional folder for bounded local Agent metadata inspection. The folder is not scanned until you explicitly start an Agent advisory scan." = "Choose an additional folder for bounded local Agent metadata inspection. The folder is not scanned until you explicitly start an Agent advisory scan.";
 "None selected. The Advisories page also performs a bounded home-folder package scan." = "None selected. The Advisories page also performs a bounded home-folder package scan.";
-"Choose an additional bounded project folder; home-folder scanning is controlled on Advisories" = "Choose an additional bounded project folder; home-folder scanning is controlled on Advisories";
 "Matching is local and advisory-only. Standard application, executable, Homebrew, and home-folder package locations are bounded; system, generated, and cache folders are skipped. Clearing this data removes the cached catalog and its local matches." = "Matching is local and advisory-only. Standard application, executable, Homebrew, and home-folder package locations are bounded; system, generated, and cache folders are skipped. Clearing this data removes the cached catalog and its local matches.";
-"Inspect project packages" = "Inspect project packages";
 "Node packages and lockfiles are read only inside folders you choose. Flowlight never crawls your whole home folder." = "Node packages and lockfiles are read only inside folders you choose. Flowlight never crawls your whole home folder.";
-"No project folder selected yet." = "No project folder selected yet.";
-"Selected project folders: %lld" = "Selected project folders: %lld";
 "No accessible software was found. Choose a project folder to inspect bounded package metadata, or scan again." = "No accessible software was found. Choose a project folder to inspect bounded package metadata, or scan again.";
 "Choose a project folder. Flowlight reads bounded package metadata inside it; it never crawls your whole home folder." = "Choose a project folder. Flowlight reads bounded package metadata inside it; it never crawls your whole home folder.";
 "Choose a project folder to inspect bounded package metadata" = "Choose a project folder to inspect bounded package metadata";
@@ -2270,3 +2260,19 @@
 "The agent's destination policy was saved, but Flowlight couldn't fully apply it: %@" = "The agent's destination policy was saved, but Flowlight couldn't fully apply it: %@";
 "Updating policy…" = "Updating policy…";
 "Partly allowed" = "Partly allowed";
+
+/* Advisories dashboards */
+"Software inventory" = "Software inventory";
+"%lld software artifacts" = "%lld software artifacts";
+"Inventory overview" = "Inventory overview";
+"Inventory sources and catalog" = "Inventory sources and catalog";
+"Agent Advisories Settings" = "Agent Advisories Settings";
+"Software Advisories Settings" = "Software Advisories Settings";
+"No accessible software was found. Use Software Advisories Settings to choose a project folder." = "No accessible software was found. Use Software Advisories Settings to choose a project folder.";
+"No findings" = "No findings";
+"Review scan coverage for the locations and files that were inspected." = "Review scan coverage for the locations and files that were inspected.";
+"Try another severity or surface filter." = "Try another severity or surface filter.";
+"Scan overview" = "Scan overview";
+"Scan coverage and analysis" = "Scan coverage and analysis";
+"Category" = "Category";
+"Paused" = "Paused";

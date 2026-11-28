@@ -175,6 +175,8 @@ final class AgentAdvisoryModel: ObservableObject {
 }
 
 struct AgentAdvisoriesView: View {
+    @Binding var showsSettings: Bool
+    @State private var showsCoverage = false
     @StateObject private var model = AgentAdvisoryModel()
     @AppStorage("FLAgentAdvisoryHomeScanConsent") private var homeScanConsent = false
     @AppStorage(AgentAdvisoryAnalysisMode.preferenceKey) private var analysisMode = AgentAdvisoryAnalysisMode.defaultMode
@@ -236,27 +238,23 @@ struct AgentAdvisoriesView: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            ScrollView {
-                VStack(alignment: .leading, spacing: Spacing.m) {
-                    explanationCard
-                    scanScopeCard
-                    switch model.phase {
-                    case .idle:
-                        idleCard
-                    case .scanning:
-                        scanningCard
-                    case .cancelled:
-                        cancelledCard
-                    case .complete:
-                        if let scanResult {
-                            resultContent(scanResult, height: geometry.size.height)
-                        }
-                    }
+        GeometryReader { window in
+            VStack(alignment: .leading, spacing: Spacing.m) {
+                switch model.phase {
+                case .idle:
+                    idleCard
+                case .scanning:
+                    scanningCard
+                case .cancelled:
+                    cancelledCard
+                case .complete(let result):
+                    overview(result)
+                        .fixedSize(horizontal: false, vertical: true)
+                    resultContent(result)
                 }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
+            .padding(Spacing.l)
+            .frame(width: window.size.width, height: window.size.height, alignment: .topLeading)
         }
         .task {
             model.selectAnalysisMode(analysisMode)
@@ -282,33 +280,45 @@ struct AgentAdvisoriesView: View {
         } message: {
             Text(L("Flowlight will inspect bounded Agent metadata under ~ locally. It will not execute files, upload findings, or enter protected media folders. macOS privacy controls may still make coverage incomplete."))
         }
-        .sheet(item: selectedBinding) { finding in
-            AgentAdvisoryFindingDetail(finding: finding)
+        .onChange(of: model.phase) { _, phase in
+            if case .complete = phase { return }
+            selectedFindingID = nil
         }
+        .sheet(isPresented: $showsSettings) { agentSettings }
+        .sheet(item: selectedBinding) { finding in
+            AgentAdvisoryFindingDetail(finding: finding, category: categoryTitle(finding.category))
+        }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("advisories.agent")
     }
 
-    private var explanationCard: some View {
-        VStack(alignment: .leading, spacing: Spacing.s) {
-            Label(L("Agent security inventory"), systemImage: "shield.lefthalf.filled")
-                .font(.title3.weight(.semibold))
-            Text(L("Find agent instructions, skills, hooks, MCP servers, plugins, permissions, gateways, and credential-like configuration stored on this Mac."))
-                .font(.callout)
-            Text(L("The scan is local, bounded, and metadata-only. It treats discovered instructions as untrusted data, never executes them, and never sends inventory to the advisory service."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+    private var agentSettings: some View {
+        AdvisorySettingsSheet(title: AdvisoriesTab.agent.settingsTitle, identifier: "advisories.agent.settings") {
+            Form {
+                Section {
+                    scanScope
+                } header: {
+                    Text(L("Agent scan folders"))
+                }
+                Section {
+                    Picker(L("Advisory analysis"), selection: $analysisMode) {
+                        ForEach(AgentAdvisoryAnalysisMode.allCases) { Text($0.title).tag($0) }
+                    }
+                    .accessibilityIdentifier("advisories.agent.model")
+                }
+                if scanResult != nil {
+                    Section {
+                        Button(L("Clear findings"), role: .destructive) { model.clear() }
+                            .accessibilityIdentifier("advisories.agent.clear")
+                    }
+                }
+            }
+            .formStyle(.grouped)
         }
-        .padding(Spacing.m)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .flCard()
-        .accessibilityIdentifier("advisories.agent.explanation")
     }
 
-    private var scanScopeCard: some View {
+    private var scanScope: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
-            Label(L("Agent scan folders"), systemImage: "folder.badge.gearshape")
-                .font(.callout.weight(.medium))
             Text(L("With your consent, Flowlight scans your home folder and any folders you add."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -326,9 +336,11 @@ struct AgentAdvisoriesView: View {
                 HStack(spacing: Spacing.s) {
                     Image(systemName: "folder")
                         .foregroundStyle(FL.accent)
-                    Text(model.displayPath(root.path))
+                    Text(verbatim: model.displayPath(root.path))
                         .font(.caption.monospaced())
                         .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help(model.displayPath(root.path))
                     Spacer(minLength: 0)
                     Button {
                         model.removeRoot(root)
@@ -351,19 +363,8 @@ struct AgentAdvisoriesView: View {
             .buttonStyle(.bordered)
             .disabled(model.isScanning)
             .accessibilityIdentifier("advisories.agent.add-root")
-            Picker(L("Advisory analysis"), selection: $analysisMode) {
-                ForEach(AgentAdvisoryAnalysisMode.allCases) { mode in Text(mode.title).tag(mode) }
-            }
-            .fixedSize()
-            .accessibilityIdentifier("advisories.agent.model")
-            Button(L("Scan configured folders")) { requestConfiguredScan() }
-                .buttonStyle(.borderedProminent)
-                .disabled(model.isScanning)
-                .accessibilityIdentifier("advisories.agent.rescan")
         }
-        .padding(Spacing.m)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .flCard(radius: Radius.chip)
         .accessibilityIdentifier("advisories.agent.scan-scope")
     }
 
@@ -417,106 +418,161 @@ struct AgentAdvisoriesView: View {
         .accessibilityIdentifier("advisories.agent.cancelled")
     }
 
-    private func resultContent(_ result: AgentAdvisoryScanResult, height: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.m) {
-            resultBanner(result)
-            riskSignals(result)
-            summary(result)
-            if analysisMode == .appleOnDevice { analysisCard }
-            HStack(spacing: Spacing.s) {
-                Picker(L("Severity"), selection: $severityFilter) {
-                    ForEach(SeverityFilter.allCases) { Text($0.title).tag($0) }
+    private func resultContent(_ result: AgentAdvisoryScanResult) -> some View {
+        let visible = findings
+        return VStack(alignment: .leading, spacing: Spacing.s) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Spacing.m) {
+                    findingsTitle
+                    Spacer(minLength: 0)
+                    filters
                 }
-                .pickerStyle(.segmented)
-                Picker(L("Surface"), selection: $categoryFilter) {
-                    ForEach(CategoryFilter.allCases) { Text($0.title).tag($0) }
+                VStack(alignment: .leading, spacing: Spacing.s) {
+                    findingsTitle
+                    filters
                 }
-                .frame(width: 210)
-                Spacer(minLength: 0)
-                Button(L("Clear")) { model.clear() }
-                    .buttonStyle(.bordered)
             }
-            .accessibilityIdentifier("advisories.agent.filters")
-            if findings.isEmpty {
+            if visible.isEmpty {
                 ContentUnavailableView {
-                    Label(L("No findings in this filter"), systemImage: "checkmark.shield")
+                    Label(result.totalFindingCount == 0 ? L("No findings") : L("No findings in this filter"),
+                          systemImage: "doc.text.magnifyingglass")
                 } description: {
-                    Text(L("No finding is proof of safety when coverage is incomplete; review the scan status above."))
+                    Text(result.totalFindingCount == 0
+                         ? L("Review scan coverage for the locations and files that were inspected.")
+                         : L("Try another severity or surface filter."))
                 }
-                .frame(maxWidth: .infinity, minHeight: 180)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                Table(findings, selection: $selectedFindingID) {
-                    TableColumn(L("Agent")) { finding in
-                        Text(finding.agent).lineLimit(1)
-                    }
-                    .width(min: 100, ideal: 130)
-                    TableColumn(L("Finding")) { finding in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(finding.title).lineLimit(1)
-                            Text(finding.category.rawValue.uppercased())
-                                .font(.caption2).foregroundStyle(.secondary)
-                        }
-                    }
-                    .width(min: 180, ideal: 260)
-                    TableColumn(L("Severity")) { finding in
-                        FLPill(text: finding.severity.title, systemImage: severityIcon(finding.severity),
-                               color: severityColor(finding.severity))
-                    }
-                    .width(min: 100, ideal: 120)
-                    TableColumn(L("Source")) { finding in
-                        Text(finding.source).font(.caption.monospaced()).lineLimit(1)
-                    }
-                    .width(min: 180, ideal: 260)
+                GeometryReader { viewport in
+                    findingsTable(visible)
+                        .frame(width: viewport.size.width, height: viewport.size.height)
                 }
-                .frame(minHeight: 220, maxHeight: max(220, height - 520))
-                .accessibilityIdentifier("advisories.agent.findings")
             }
-            sourceDisclosure(result)
         }
+    }
+
+    private var findingsTitle: some View {
+        Text(L("Findings")).font(.headline).fixedSize().accessibilityAddTraits(.isHeader)
+    }
+
+    private var filters: some View {
+        HStack(spacing: Spacing.m) {
+            Picker(L("Severity"), selection: $severityFilter) {
+                ForEach(SeverityFilter.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.menu)
+            .fixedSize()
+            Picker(L("Surface"), selection: $categoryFilter) {
+                ForEach(CategoryFilter.allCases) { Text($0.title).tag($0) }
+            }
+            .fixedSize()
+        }
+        .accessibilityIdentifier("advisories.agent.filters")
+    }
+
+    private func findingsTable(_ visible: [AgentAdvisoryFinding]) -> some View {
+        Table(visible, selection: $selectedFindingID) {
+            TableColumn(L("Agent")) { finding in
+                Text(verbatim: finding.agent).lineLimit(1)
+            }
+            .width(min: 76, ideal: 115)
+            TableColumn(L("Finding")) { finding in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(finding.title).lineLimit(1).help(finding.title)
+                    Text(categoryTitle(finding.category))
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+            }
+            .width(min: 180, ideal: 260)
+            TableColumn(L("Severity")) { finding in
+                AgentAdvisorySeverityBadge(severity: finding.severity)
+            }
+            .width(min: 82, ideal: 110)
+            TableColumn(L("Source")) { finding in
+                Text(verbatim: finding.source).font(.caption.monospaced()).lineLimit(1)
+                    .truncationMode(.middle).help(finding.source)
+            }
+            .width(min: 155, ideal: 260)
+        }
+        .accessibilityIdentifier("advisories.agent.findings")
+    }
+
+    private func overview(_ result: AgentAdvisoryScanResult) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            HStack(spacing: Spacing.m) {
+                Text(L("Scan overview"))
+                    .font(.title3.weight(.semibold))
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 0)
+                Button(action: requestConfiguredScan) {
+                    Label(L("Scan again"), systemImage: "arrow.clockwise")
+                }
+                .accessibilityIdentifier("advisories.agent.rescan")
+            }
+            summary(result)
+            Divider()
+            resultBanner(result)
+            Text(L("Supported settings inspected: %lld of %lld found", result.settingsInspected, result.settingsPresent))
+                .font(.caption).foregroundStyle(.secondary)
+            if result.omittedFindings > 0 {
+                AdvisoryStatusLine(title: L("Findings hidden by the display limit: %lld", result.omittedFindings),
+                                   systemImage: "line.3.horizontal.decrease.circle", tint: FL.warning)
+            }
+            riskSignals(result)
+            AdvisoryOverviewDisclosure(title: analysisMode == .appleOnDevice ? L("Scan coverage and analysis") : L("Scan coverage"),
+                                       expanded: $showsCoverage, identifier: "advisories.agent.coverage.disclosure") {
+                VStack(alignment: .leading, spacing: Spacing.m) {
+                    sourceDisclosure(result)
+                    if analysisMode == .appleOnDevice { analysisCard }
+                    Text(L("The scan is local, bounded, and metadata-only. It treats discovered instructions as untrusted data, never executes them, and never sends inventory to the advisory service."))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(Spacing.m)
+        .flCard(radius: Radius.chip)
     }
 
     private func resultBanner(_ result: AgentAdvisoryScanResult) -> some View {
         let complete = result.complete
-        return HStack(alignment: .top, spacing: Spacing.s) {
-            Image(systemName: complete ? "checkmark.shield" : "exclamationmark.triangle")
-                .foregroundStyle(complete ? FL.good : FL.warning)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(complete ? L("Agent metadata scan complete") : L("Agent metadata scan is incomplete"))
-                    .font(.callout.weight(.medium))
-                Text(complete
-                     ? L("Accessible candidate files were inspected within the configured bounds.")
-                     : L("Some locations were inaccessible or a scan limit was reached. This is not a safety claim."))
+        return VStack(alignment: .leading, spacing: Spacing.xs) {
+            AdvisoryStatusLine(title: complete ? L("Agent metadata scan complete") : L("Agent metadata scan is incomplete"),
+                               systemImage: complete ? "checkmark.shield" : "exclamationmark.triangle",
+                               tint: complete ? FL.good : FL.warning)
+            if !complete {
+                Text(L("Some locations were inaccessible or a scan limit was reached. This is not a safety claim."))
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: 0)
         }
-        .padding(Spacing.m)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background((complete ? FL.good : FL.warning).opacity(0.10), in: RoundedRectangle(cornerRadius: Radius.chip))
         .accessibilityIdentifier("advisories.agent.status")
     }
 
     private func riskSignals(_ result: AgentAdvisoryScanResult) -> some View {
-        HStack(spacing: Spacing.s) {
-            riskTile(L("Private data access"), result.privateDataAccess, "lock.document", FL.warning)
-            riskTile(L("Untrusted content"), result.untrustedContent, "text.badge.xmark", FL.warning)
-            riskTile(L("External egress"), result.externalEgress, "arrow.up.right.circle", FL.critical)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Spacing.l) { signalLabels(result) }
+            VStack(alignment: .leading, spacing: Spacing.xs) { signalLabels(result) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("advisories.agent.risk-signals")
     }
 
-    private func riskTile(_ title: String, _ present: Bool, _ image: String, _ tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Image(systemName: image).foregroundStyle(present ? tint : FL.good)
-            Text(title).font(.caption.weight(.medium))
-            Text(present ? L("Observed") : L("Not observed"))
-                .font(.caption2).foregroundStyle(.secondary)
+    @ViewBuilder
+    private func signalLabels(_ result: AgentAdvisoryScanResult) -> some View {
+        riskSignal(L("Private data access"), result.privateDataAccess, "lock.document", FL.warning)
+        riskSignal(L("Untrusted content"), result.untrustedContent, "text.badge.xmark", FL.warning)
+        riskSignal(L("External egress"), result.externalEgress, "arrow.up.right.circle", FL.critical)
+    }
+
+    private func riskSignal(_ title: String, _ present: Bool, _ image: String, _ tint: Color) -> some View {
+        HStack(spacing: Spacing.xs) {
+            Image(systemName: image).foregroundStyle(present ? tint : .secondary).accessibilityHidden(true)
+            Text(title).fontWeight(.medium)
+            Text(present ? L("Observed") : L("Not observed")).foregroundStyle(.secondary)
         }
-        .padding(Spacing.s)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .flCard(radius: Radius.chip)
+        .font(.caption2)
+        .fixedSize()
+        .accessibilityElement(children: .combine)
     }
 
     private var analysisCard: some View {
@@ -546,9 +602,7 @@ struct AgentAdvisoriesView: View {
         }
         .font(.caption)
         .fixedSize(horizontal: false, vertical: true)
-        .padding(Spacing.m)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .flCard(radius: Radius.chip)
         .accessibilityIdentifier("advisories.agent.model-status")
     }
 
@@ -564,27 +618,25 @@ struct AgentAdvisoriesView: View {
         let inspected = result.sources.reduce(0) { $0 + $1.filesRead }
         let high = result.observedEvidence.reduce(0) { $0 + ($1.severity >= .high ? $1.count : 0) }
         let agents = result.inspectedEcosystems.count
-        return HStack(spacing: Spacing.s) {
-            StatTile(title: L("Findings"), value: "\(result.totalFindingCount)", systemImage: "flag")
-            StatTile(title: L("High / critical"), value: "\(high)", systemImage: "exclamationmark.triangle",
-                     tint: high > 0 ? FL.critical : .secondary)
-            StatTile(title: L("Agent ecosystems"), value: "\(agents)", systemImage: "sparkles")
-            StatTile(title: L("Files inspected"), value: "\(inspected)", systemImage: "doc.text.magnifyingglass")
+        return HStack(spacing: Spacing.m) {
+            AdvisoryOverviewMetric(title: L("Findings"), value: result.totalFindingCount)
+            Divider().frame(height: 32)
+            AdvisoryOverviewMetric(title: L("High / critical"), value: high,
+                                   icon: high > 0 ? "exclamationmark.triangle.fill" : nil, tint: FL.critical)
+            Divider().frame(height: 32)
+            AdvisoryOverviewMetric(title: L("Agent ecosystems"), value: agents)
+            Divider().frame(height: 32)
+            AdvisoryOverviewMetric(title: L("Files inspected"), value: inspected)
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func sourceDisclosure(_ result: AgentAdvisoryScanResult) -> some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
-            Text(L("Scan coverage")).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-            Text(L("Supported settings inspected: %lld of %lld found", result.settingsInspected, result.settingsPresent))
-                .font(.caption.weight(.medium))
+            Text(L("Scan coverage")).font(.callout.weight(.semibold))
             if !result.inspectedEcosystems.isEmpty {
                 Text(result.inspectedEcosystems.map(ecosystemName).joined(separator: ", "))
                     .font(.caption).foregroundStyle(.secondary)
-            }
-            if result.omittedFindings > 0 {
-                Text(L("Findings hidden by the display limit: %lld", result.omittedFindings))
-                    .font(.caption).foregroundStyle(FL.warning)
             }
             ForEach(result.sources) { source in
                 HStack(alignment: .top, spacing: Spacing.s) {
@@ -607,9 +659,7 @@ struct AgentAdvisoriesView: View {
                 .accessibilityElement(children: .combine)
             }
         }
-        .padding(Spacing.m)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .flCard(radius: Radius.chip)
         .accessibilityIdentifier("advisories.agent.coverage")
     }
 
@@ -631,11 +681,33 @@ struct AgentAdvisoriesView: View {
         }
     }
 
-    private func severityIcon(_ severity: AgentAdvisoryFinding.Severity) -> String {
-        severity >= .high ? "exclamationmark.triangle.fill" : severity == .medium ? "questionmark.circle" : "info.circle"
+}
+
+private struct AgentAdvisorySeverityBadge: View {
+    let severity: AgentAdvisoryFinding.Severity
+
+    var body: some View {
+        Label {
+            Text(severity.title).foregroundStyle(.primary)
+        } icon: {
+            Image(systemName: icon).foregroundStyle(tint).accessibilityHidden(true)
+        }
+        .font(.caption2.weight(.semibold))
+        .padding(.horizontal, Spacing.s)
+        .padding(.vertical, 2)
+        .background(tint.opacity(0.12), in: Capsule())
+        .accessibilityElement(children: .combine)
     }
 
-    private func severityColor(_ severity: AgentAdvisoryFinding.Severity) -> Color {
+    private var icon: String {
+        switch severity {
+        case .critical, .high: return "exclamationmark.triangle.fill"
+        case .medium: return "questionmark.circle"
+        case .low, .info: return "info.circle"
+        }
+    }
+
+    private var tint: Color {
         switch severity {
         case .critical, .high: return FL.critical
         case .medium: return FL.warning
@@ -647,38 +719,100 @@ struct AgentAdvisoriesView: View {
 
 private struct AgentAdvisoryFindingDetail: View {
     let finding: AgentAdvisoryFinding
+    let category: String
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: Spacing.m) {
-                    FLContextRow(title: finding.title,
-                                 details: [finding.agent, finding.source,
-                                           finding.category.rawValue.uppercased(), finding.surface.title],
-                                 systemImage: "shield.lefthalf.filled",
-                                 tint: finding.severity >= .high ? FL.critical : FL.warning,
-                                 identifier: "advisories.agent.detail.identity")
-                    VStack(alignment: .leading, spacing: Spacing.s) {
-                        Text(L("Why it matters")).font(.headline)
-                        Text(finding.explanation)
-                        Text(L("Recommended action")).font(.headline)
-                        Text(finding.remediation)
+                VStack(alignment: .leading, spacing: Spacing.l) {
+                    header
+                    context
+                    Divider()
+                    VStack(alignment: .leading, spacing: Spacing.l) {
+                        guidance(L("Why it matters"), finding.explanation, icon: "info.circle", tint: FL.muted)
+                        guidance(L("Recommended action"), finding.remediation, icon: "checklist", tint: FL.accent)
                     }
-                    .padding(Spacing.m)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .flCard()
                     .accessibilityIdentifier("advisories.agent.detail.guidance")
                 }
                 .padding(Spacing.l)
             }
-            .navigationTitle(L("Agent finding"))
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(L("Done")) { dismiss() }
-                }
+            Divider()
+            HStack {
+                Spacer()
+                Button(L("Done")) { dismiss() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(.horizontal, Spacing.l)
+            .padding(.vertical, Spacing.m)
+        }
+        .frame(width: 580, height: 360)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("advisories.agent.detail")
+    }
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: Spacing.m) {
+            Image(systemName: "shield.lefthalf.filled")
+                .font(.title2.weight(.medium))
+                .foregroundStyle(FL.accent)
+                .frame(width: 40, height: 40)
+                .background(FL.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.chip))
+                .accessibilityHidden(true)
+            Text(finding.title)
+                .font(.title2.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            AgentAdvisorySeverityBadge(severity: finding.severity)
+                .fixedSize()
+                .accessibilityIdentifier("advisories.agent.detail.severity")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("advisories.agent.detail.identity")
+    }
+
+    private var context: some View {
+        VStack(alignment: .leading, spacing: Spacing.m) {
+            HStack(alignment: .top, spacing: Spacing.m) {
+                metadata(L("Agent"), finding.agent)
+                metadata(L("Category"), category)
+                metadata(L("Surface"), finding.surface.title)
+            }
+            Divider()
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Label(L("Source"), systemImage: "doc.text")
+                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Text(verbatim: finding.source)
+                    .font(.callout.monospaced())
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("advisories.agent.detail.source")
             }
         }
-        .frame(minWidth: 560, minHeight: 360)
+        .padding(Spacing.m)
+        .flCard(radius: Radius.chip)
+    }
+
+    private func metadata(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            Text(verbatim: value).font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func guidance(_ title: String, _ body: String, icon: String, tint: Color) -> some View {
+        HStack(alignment: .top, spacing: Spacing.s) {
+            Image(systemName: icon).foregroundStyle(tint).frame(width: 18).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Text(title).font(.headline).accessibilityAddTraits(.isHeader)
+                Text(verbatim: body).font(.callout).textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }

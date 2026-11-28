@@ -17,7 +17,6 @@
 "Agent advisories" = "에이전트 권고";
 "Software" = "소프트웨어";
 "Local agent metadata · bounded, no execution" = "로컬 에이전트 메타데이터 · 제한됨, 실행하지 않음";
-"Agent security inventory" = "에이전트 보안 인벤토리";
 "Scan agent files" = "에이전트 파일 스캔";
 "Scan /" = "/ 스캔";
 "Scanning accessible agent metadata under /…" = "/ 아래의 접근 가능한 에이전트 메타데이터 스캔 중…";
@@ -57,23 +56,14 @@
 "Recursive home scan · depth %lld · %lld directories · system, generated, hidden, and cache folders skipped." = "홈 폴더 재귀 스캔 · 깊이 %lld · 폴더 %lld개 · 숨김, 보호, 빌드, 캐시 폴더 제외.";
 "Home scan is bounded at depth %lld and %lld directories; system, generated, hidden, and cache folders are skipped." = "홈 스캔은 깊이 %lld, 폴더 %lld개로 제한되며 보호, 숨김, 빌드, 캐시 폴더를 제외합니다.";
 "Scan home folder recursively" = "홈 폴더 재귀 스캔";
-"Pause home folder scanning" = "홈 폴더 스캔 일시 중지";
 "Flowlight reads package metadata locally with bounded depth and directory limits. It skips system, generated, hidden, and cache folders and never executes project code." = "Flowlight는 깊이와 폴더 수를 제한해 패키지 메타데이터를 로컬에서 읽습니다. 보호, 숨김, 빌드, 캐시 폴더를 제외하며 프로젝트 코드를 실행하지 않습니다.";
 "Home folder scan is paused. Re-enable it to inspect package metadata under your home folder." = "홈 폴더 스캔이 일시 중지되었습니다. 다시 켜면 패키지 메타데이터를 검사합니다.";
-"Node packages and lockfiles are read locally under your home folder and any project folders you choose. Flowlight skips system, generated, and cache folders and never executes project code." = "Node 패키지와 잠금 파일은 홈 폴더 및 선택한 프로젝트에서 로컬로 읽습니다. 보호 및 생성 폴더를 제외하며 프로젝트 코드를 실행하지 않습니다.";
 "This inventory may be incomplete. Only bounded, accessible sources are shown." = "이 인벤토리는 불완전할 수 있습니다. 제한 내에서 접근 가능한 소스만 표시됩니다.";
-"Limited source: %@" = "제한된 소스: %@";
-"No accessible software was found. Home folder scanning is bounded and can be paused above; choose a project folder for an additional focused scan, or scan again." = "접근 가능한 소프트웨어를 찾지 못했습니다. 홈 스캔은 제한되며 위에서 일시 중지할 수 있습니다. 추가 프로젝트를 선택하거나 다시 스캔하세요.";
-"No accessible software was found in standard locations, the home folder, or selected project folders." = "표준 위치, 홈 폴더 또는 선택한 프로젝트 폴더에서 접근 가능한 소프트웨어를 찾지 못했습니다.";
 "Choose an additional project folder. Flowlight also scans bounded package metadata throughout your home folder, while skipping system, generated, and cache folders." = "추가 프로젝트 폴더를 선택하세요. Flowlight는 홈 폴더의 제한된 패키지 메타데이터도 스캔하며 보호 및 생성 폴더를 제외합니다.";
 "Choose an additional folder for bounded local Agent metadata inspection. The folder is not scanned until you explicitly start an Agent advisory scan." = "제한된 로컬 에이전트 메타데이터 검사를 위한 추가 폴더를 선택하세요. 명시적으로 에이전트 권고 스캔을 시작할 때까지 폴더는 스캔되지 않습니다.";
 "None selected. The Advisories page also performs a bounded home-folder package scan." = "선택된 폴더가 없습니다. 자문 페이지는 제한된 홈 폴더 패키지 스캔도 수행합니다.";
-"Choose an additional bounded project folder; home-folder scanning is controlled on Advisories" = "추가 제한 프로젝트 폴더를 선택하세요. 홈 스캔은 자문 페이지에서 제어합니다";
 "Matching is local and advisory-only. Standard application, executable, Homebrew, and home-folder package locations are bounded; system, generated, and cache folders are skipped. Clearing this data removes the cached catalog and its local matches." = "일치는 로컬에서만 수행되며 참고용입니다. 앱, 실행 파일, Homebrew, 홈 폴더 패키지 위치는 제한되고 보호 및 생성 폴더는 제외됩니다. 지우면 캐시된 카탈로그와 로컬 일치 결과가 삭제됩니다.";
-"Inspect project packages" = "프로젝트 패키지 검사";
 "Node packages and lockfiles are read only inside folders you choose. Flowlight never crawls your whole home folder." = "Node 패키지와 잠금 파일은 선택한 폴더 안에서만 읽습니다. Flowlight는 홈 폴더 전체를 검색하지 않습니다.";
-"No project folder selected yet." = "아직 프로젝트 폴더를 선택하지 않았습니다.";
-"Selected project folders: %lld" = "선택한 프로젝트 폴더: %lld";
 "No accessible software was found. Choose a project folder to inspect bounded package metadata, or scan again." = "접근 가능한 소프트웨어를 찾지 못했습니다. 프로젝트 폴더를 선택해 제한된 패키지 메타데이터를 검사하거나 다시 스캔하세요.";
 "Choose a project folder. Flowlight reads bounded package metadata inside it; it never crawls your whole home folder." = "프로젝트 폴더를 선택하세요. Flowlight는 해당 폴더 안의 제한된 패키지 메타데이터만 읽으며 홈 폴더 전체를 검색하지 않습니다.";
 "Choose a project folder to inspect bounded package metadata" = "제한된 패키지 메타데이터를 검사할 프로젝트 폴더 선택";
@@ -2270,3 +2260,19 @@
 "The agent's destination policy was saved, but Flowlight couldn't fully apply it: %@" = "에이전트의 대상 정책을 저장했지만 Flowlight가 정책을 완전히 적용하지 못했습니다: %@";
 "Updating policy…" = "정책 업데이트 중…";
 "Partly allowed" = "일부 허용";
+
+/* Advisories dashboards */
+"Software inventory" = "소프트웨어 인벤토리";
+"%lld software artifacts" = "소프트웨어 항목 %lld개";
+"Inventory overview" = "인벤토리 개요";
+"Inventory sources and catalog" = "인벤토리 소스 및 카탈로그";
+"Agent Advisories Settings" = "에이전트 권고 설정";
+"Software Advisories Settings" = "소프트웨어 권고 설정";
+"No accessible software was found. Use Software Advisories Settings to choose a project folder." = "접근할 수 있는 소프트웨어를 찾지 못했습니다. 소프트웨어 권고 설정에서 프로젝트 폴더를 선택하세요.";
+"No findings" = "발견 사항 없음";
+"Review scan coverage for the locations and files that were inspected." = "검사한 위치와 파일은 스캔 범위에서 확인할 수 있습니다.";
+"Try another severity or surface filter." = "다른 심각도 또는 영역 필터를 사용해 보세요.";
+"Scan overview" = "스캔 개요";
+"Scan coverage and analysis" = "스캔 범위 및 분석";
+"Category" = "범주";
+"Paused" = "일시 중지됨";

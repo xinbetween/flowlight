@@ -20,6 +20,7 @@ struct ContentView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var demoPluginReview: PluginPackageReview?
+    @State private var advisorySettingsTab: AdvisoriesTab?
 
     var body: some View {
         NavigationSplitView {
@@ -86,10 +87,13 @@ struct ContentView: View {
                 case .inspect: InspectView()
                 case .ask: AskView()
                 case .sources: SourcesView(selection: $nav.sourcesTab)
-                case .advisories: AdvisoriesView(store: monitor.advisories, updater: monitor.advisoryCatalog)
+                case .advisories:
+                    AdvisoriesView(store: monitor.advisories, updater: monitor.advisoryCatalog,
+                                   settingsTab: $advisorySettingsTab)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onChange(of: nav.selection) { _, _ in advisorySettingsTab = nil }
             .safeAreaInset(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
                     if focus.isActive {
@@ -110,7 +114,16 @@ struct ContentView: View {
                         .accessibilityLabel("\(L("Back")): \(destination.title)")
                     }
                 }
-                ToolbarItem {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    if nav.selection == .advisories {
+                        let title = nav.advisoriesTab.settingsTitle
+                        Button { advisorySettingsTab = nav.advisoriesTab } label: {
+                            Image(systemName: "gearshape")
+                        }
+                        .help(title)
+                        .accessibilityLabel(title)
+                        .accessibilityIdentifier("advisories.settings")
+                    }
                     Button { NSWorkspace.shared.open(Help.forScreen(nav.selection)) } label: {
                         Image(systemName: "questionmark.circle")
                     }
