@@ -472,7 +472,7 @@ struct AdvisoriesView: View {
     }
 
     private var table: some View {
-        Table(filteredRows, selection: $selectedArtifactID, sortOrder: $sortOrder) {
+        Table(filteredRows.sorted(using: sortOrder), selection: $selectedArtifactID, sortOrder: $sortOrder) {
             TableColumn(L("Software"), value: \.artifact.name) { row in
                 HStack(spacing: Spacing.s) {
                     if row.artifact.kind == .application, let iconPath = row.artifact.iconPath {
