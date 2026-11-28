@@ -169,6 +169,45 @@ final class AdvisoryInventoryTests: XCTestCase {
         XCTAssertTrue(try complete(L("Home folder")))
     }
 
+    func testRootPackageManifestsTakePriorityOverSubtreesUnderBothCaps() throws {
+        let manager = FileManager.default
+        let temp = manager.temporaryDirectory.appendingPathComponent("advisory-root-manifest-priority-\(UUID().uuidString)")
+        defer { try? manager.removeItem(at: temp) }
+        let manifests = [
+            (name: "requirements.txt", artifact: "requests", text: "requests==2.32.3\n"),
+            (name: "Cargo.lock", artifact: "serde", text: "[[package]]\nname = \"serde\"\nversion = \"1.0.210\"\n"),
+        ]
+        // Swap the file and directory roles while keeping root entry names and creation order fixed.
+        // This exercises the directory-first case without relying on one filesystem's filename ordering.
+        for fileIndex in manifests.indices {
+            let root = temp.appendingPathComponent("project-\(fileIndex)")
+            try manager.createDirectory(at: root, withIntermediateDirectories: true)
+            for (index, manifest) in manifests.enumerated() {
+                let entry = root.appendingPathComponent(manifest.name)
+                if index == fileIndex {
+                    try Data(manifest.text.utf8).write(to: entry)
+                } else {
+                    let package = entry.appendingPathComponent("node_modules/dependency/package.json")
+                    try manager.createDirectory(at: package.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try Data(#"{"name":"dependency","version":"1.0.0"}"#.utf8).write(to: package)
+                }
+            }
+            for (entries, artifacts) in [(2, 100), (100, 1)] {
+                let config = AdvisoryInventoryScanner.Configuration(
+                    applicationRoots: [], executableRoots: [], homebrewPrefixes: [],
+                    selectedProjectRoots: [AdvisoryInventoryRoot(path: root.path, userSelected: true)],
+                    maximumPackageArtifacts: artifacts, maximumProjectEntries: entries
+                )
+                let result = AdvisoryInventoryScanner(configuration: config).scan()
+                let source = try XCTUnwrap(result.sources.first { $0.source == root.path })
+                XCTAssertEqual(result.artifacts.map(\.identifier), [manifests[fileIndex].artifact],
+                               "Entry cap \(entries), artifact cap \(artifacts)")
+                XCTAssertEqual(source.discovered, 1)
+                XCTAssertFalse(source.complete)
+            }
+        }
+    }
+
     func testNodePackageArtifactsRespectTheAggregateCapAndReportIncompleteSource() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-node-cap-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }

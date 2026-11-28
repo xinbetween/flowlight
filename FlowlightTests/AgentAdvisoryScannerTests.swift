@@ -100,6 +100,88 @@ final class AgentAdvisoryScannerTests: XCTestCase {
         }
     }
 
+    func testTOMLMultilineCredentialValuesAreDetectedAndRedacted() throws {
+        try withFixture { root in
+            try write(#"""
+            private_key = """
+            synthetic-TOML-basic
+            with "quoted" text
+            """
+            """#, to: ".codex/config.toml", under: root)
+            try write(#"""
+            api_key = '''
+            synthetic-TOML-literal
+            '''
+            """#, to: ".codex/literal.toml", under: root)
+            try write(#"""
+            api_key = """\
+                 ${API_\
+                 KEY}"""
+            """#, to: ".codex/reference.toml", under: root)
+
+            let scan = AgentAdvisoryScanner(configuration: .init(roots: [root])).scan()
+            let credentials = scan.findings.filter { $0.category == .credentials }
+            XCTAssertEqual(credentials.map(\.source), ["scan-root/.codex/config.toml", "scan-root/.codex/literal.toml"])
+            XCTAssertTrue(credentials.allSatisfy { $0.severity == .critical })
+            XCTAssertFalse(String(reflecting: scan).contains("synthetic-TOML-"))
+            XCTAssertFalse(AgentAdvisoryAnalysisInput(result: scan).prompt.contains("synthetic-TOML-"))
+        }
+    }
+
+    func testYAMLCredentialsInMappingsAndSequenceItemsAreDetectedAndRedacted() throws {
+        try withFixture { root in
+            try write(#"""
+            env: { public: true, API_KEY: synthetic-YAML-inline }
+            """#, to: ".continue/inline.yaml", under: root)
+            try write(#"""
+            profiles:
+              - token: 'synthetic-YAML-sequence'
+            """#, to: ".continue/sequence.yml", under: root)
+            try write(#"""
+            profiles:
+              - [{ "authorization":"Bearer synthetic-YAML-nested" }]
+            """#, to: ".continue/nested.yaml", under: root)
+            try write(#"""
+            private_key: |
+              synthetic-YAML-block
+              second-line
+            """#, to: ".continue/block.yml", under: root)
+
+            let scan = AgentAdvisoryScanner(configuration: .init(roots: [root])).scan()
+            let credentials = scan.findings.filter { $0.category == .credentials }
+            XCTAssertEqual(credentials.map(\.source), ["scan-root/.continue/block.yml", "scan-root/.continue/inline.yaml",
+                                                       "scan-root/.continue/nested.yaml", "scan-root/.continue/sequence.yml"])
+            XCTAssertTrue(credentials.allSatisfy { $0.severity == .critical })
+            XCTAssertFalse(String(reflecting: scan).contains("synthetic-YAML-"))
+            XCTAssertFalse(AgentAdvisoryAnalysisInput(result: scan).prompt.contains("synthetic-YAML-"))
+        }
+    }
+
+    func testYAMLDescriptionSamplesAndReferencesAreNotCredentialEvidence() throws {
+        try withFixture { root in
+            try write(#"""
+            instructions: &sample >-
+              api_key: sample-inside-described-block
+              env: { token: sample-inside-described-map }
+            profiles:
+              - note: |2-
+                  password: sample-inside-sequence-block
+              - |
+                token: sample-inside-sequence-scalar
+              - token: ${TOKEN}
+            text: a quoted example of {token: sample-inside-plain-text}
+            other: { note: '{password: sample-inside-quoted-text}', token: '$API_TOKEN' }
+            password: |
+              ${PASSWORD}
+            """#, to: ".continue/config.yaml", under: root)
+
+            let scan = AgentAdvisoryScanner(configuration: .init(roots: [root])).scan()
+            XCTAssertEqual(scan.sources.first?.filesRead, 1)
+            XCTAssertFalse(scan.privateDataAccess)
+            XCTAssertFalse(scan.observedEvidence.contains { $0.category == .credentials || $0.severity == .critical })
+        }
+    }
+
     func testSymlinkedAgentFilesAreNotRead() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("agent-advisory-links-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }

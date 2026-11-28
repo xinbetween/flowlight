@@ -606,8 +606,8 @@ struct AdvisoryInventoryScanner {
         let maximumEntries = max(0, policy.maximumEntries)
         let maximumArtifacts = max(0, policy.maximumArtifacts)
 
-        // The stream owns its descriptor. Keep only the active path open, with no queued child paths
-        // that could be replaced by symlinks before inspection.
+        // Each stream owns its descriptor. Only names of eligible child directories are buffered,
+        // within the shared entry budget, so manifests here get priority over descendants.
         func walk(_ descriptor: Int32, url: URL, depth: Int, inNodeModules: Bool) {
             guard visits < maximumVisits, artifacts.count < maximumArtifacts, !Task.isCancelled else {
                 close(descriptor)
@@ -621,6 +621,7 @@ struct AdvisoryInventoryScanner {
                 return
             }
             defer { closedir(stream) }
+            var childDirectories: [String] = []
             while !stopped {
                 if Task.isCancelled {
                     stopped = true
@@ -630,7 +631,7 @@ struct AdvisoryInventoryScanner {
                 errno = 0
                 guard let entry = readdir(stream) else {
                     if errno != 0 { complete = false }
-                    return
+                    break
                 }
                 let capacity = Int(entry.pointee.d_namlen) + 1
                 let name = withUnsafePointer(to: &entry.pointee.d_name) {
@@ -655,13 +656,9 @@ struct AdvisoryInventoryScanner {
                     complete = false
                     continue
                 }
-                let isDirectory = (info.st_mode & S_IFMT) == S_IFDIR
-                let childURL = url.appendingPathComponent(name, isDirectory: isDirectory)
-                if isDirectory {
+                if (info.st_mode & S_IFMT) == S_IFDIR {
                     guard depth < maximumDepth, visits < maximumVisits else { complete = false; continue }
-                    let child = openat(descriptor, name, Self.packageDirectoryFlags)
-                    guard child >= 0 else { complete = false; continue }
-                    walk(child, url: childURL, depth: depth + 1, inNodeModules: inNodeModules || name == "node_modules")
+                    childDirectories.append(name)
                     continue
                 }
                 guard let manager else { continue }
@@ -679,7 +676,8 @@ struct AdvisoryInventoryScanner {
                     ))
                 } else {
                     let remaining = maximumArtifacts - artifacts.count
-                    guard let discovered = readPackageArtifacts(data, at: childURL, manager: manager, limit: remaining),
+                    let manifest = url.appendingPathComponent(name, isDirectory: false)
+                    guard let discovered = readPackageArtifacts(data, at: manifest, manager: manager, limit: remaining),
                           !discovered.isEmpty || manager == .pip else {
                         complete = false
                         continue
@@ -691,6 +689,16 @@ struct AdvisoryInventoryScanner {
                     complete = false
                     return
                 }
+            }
+            for name in childDirectories {
+                guard !stopped, !Task.isCancelled, visits < maximumVisits else {
+                    complete = false
+                    return
+                }
+                let child = openat(descriptor, name, Self.packageDirectoryFlags)
+                guard child >= 0 else { complete = false; continue }
+                walk(child, url: url.appendingPathComponent(name, isDirectory: true),
+                     depth: depth + 1, inNodeModules: inNodeModules || name == "node_modules")
             }
         }
 

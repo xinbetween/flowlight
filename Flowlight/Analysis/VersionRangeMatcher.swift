@@ -75,30 +75,36 @@ enum VersionRangeMatcher {
         var patch: UInt64
         var prerelease: [String]
 
+        static func isNumeric<T: StringProtocol>(_ value: T) -> Bool {
+            !value.isEmpty && value.utf8.allSatisfy { (48...57).contains($0) }
+        }
+
+        private static func isIdentifier<T: StringProtocol>(_ value: T) -> Bool {
+            !value.isEmpty && value.utf8.allSatisfy { byte in
+                (48...57).contains(byte) || (65...90).contains(byte) || (97...122).contains(byte) || byte == 45
+            }
+        }
+
         static func parse(_ value: String?) -> SemVer? {
             guard let value else { return nil }
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
             let buildParts = trimmed.split(separator: "+", maxSplits: 1, omittingEmptySubsequences: false)
             if buildParts.count == 2 {
                 let buildIdentifiers = buildParts[1].split(separator: ".", omittingEmptySubsequences: false)
-                guard !buildIdentifiers.isEmpty, buildIdentifiers.allSatisfy({ identifier in
-                    !identifier.isEmpty && identifier.utf8.allSatisfy { byte in
-                        (48...57).contains(byte) || (65...90).contains(byte) || (97...122).contains(byte) || byte == 45
-                    }
-                }) else { return nil }
+                guard !buildIdentifiers.isEmpty, buildIdentifiers.allSatisfy({ isIdentifier($0) }) else { return nil }
             }
             let parts = buildParts[0].split(separator: "-", maxSplits: 1, omittingEmptySubsequences: false)
             let numbers = parts[0].split(separator: ".", omittingEmptySubsequences: false)
             guard numbers.count == 3,
-                  numbers.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isNumber) }),
+                  numbers.allSatisfy({ isNumeric($0) }),
                   numbers.allSatisfy({ $0.count == 1 || $0.first != "0" }),
                   let major = UInt64(numbers[0]), let minor = UInt64(numbers[1]), let patch = UInt64(numbers[2]) else {
                 return nil
             }
             let prerelease = parts.count == 2 ? parts[1].split(separator: ".", omittingEmptySubsequences: false).map(String.init) : []
             guard prerelease.allSatisfy({ component in
-                guard !component.isEmpty, component.allSatisfy({ $0.isNumber || $0.isLetter || $0 == "-" }) else { return false }
-                return !component.allSatisfy(\.isNumber) || component.count == 1 || component.first != "0"
+                guard isIdentifier(component) else { return false }
+                return !isNumeric(component) || component.count == 1 || component.first != "0"
             }) else {
                 return nil
             }
@@ -117,11 +123,13 @@ enum VersionRangeMatcher {
         for index in 0..<min(lhs.prerelease.count, rhs.prerelease.count) {
             let left = lhs.prerelease[index], right = rhs.prerelease[index]
             if left == right { continue }
-            if let leftNumber = UInt64(left), let rightNumber = UInt64(right) {
-                return leftNumber < rightNumber ? .orderedAscending : .orderedDescending
+            let leftNumeric = SemVer.isNumeric(left)
+            let rightNumeric = SemVer.isNumeric(right)
+            if leftNumeric != rightNumeric { return leftNumeric ? .orderedAscending : .orderedDescending }
+            // Numeric identifiers have no leading zeros, so length orders them without fixed-width overflow.
+            if leftNumeric && left.utf8.count != right.utf8.count {
+                return left.utf8.count < right.utf8.count ? .orderedAscending : .orderedDescending
             }
-            if UInt64(left) != nil { return .orderedAscending }
-            if UInt64(right) != nil { return .orderedDescending }
             return left < right ? .orderedAscending : .orderedDescending
         }
         if lhs.prerelease.count == rhs.prerelease.count { return .orderedSame }
@@ -160,9 +168,10 @@ enum VersionRangeMatcher {
         var preNumber: UInt64
         var devNumber: UInt64?
         var postNumber: UInt64?
+        var localVersion: String?
 
         private static let pattern = try! NSRegularExpression(
-            pattern: #"\A\s*v?(?:([0-9]+)!)?([0-9]+(?:\.[0-9]+)*)(?:[._-]?(alpha|beta|preview|pre|rc|a|b|c)[._-]?([0-9]+)?)?(?:-([0-9]+)|[._-]?(post|rev|r)[._-]?([0-9]+)?)?(?:[._-]?(dev)[._-]?([0-9]+)?)?(?:\+[a-z0-9]+(?:[._-][a-z0-9]+)*)?\s*\z"#,
+            pattern: #"\A\s*v?(?:([0-9]+)!)?([0-9]+(?:\.[0-9]+)*)(?:[._-]?(alpha|beta|preview|pre|rc|a|b|c)[._-]?([0-9]+)?)?(?:-([0-9]+)|[._-]?(post|rev|r)[._-]?([0-9]+)?)?(?:[._-]?(dev)[._-]?([0-9]+)?)?(?:\+([a-z0-9]+(?:[._-][a-z0-9]+)*))?\s*\z"#,
             options: .caseInsensitive
         )
 
@@ -200,8 +209,14 @@ enum VersionRangeMatcher {
             } else {
                 devNumber = nil
             }
+            let localVersion = capture(10)?.lowercased().split(whereSeparator: { [".", "_", "-"].contains($0) })
+                .map { component -> String in
+                    guard SemVer.isNumeric(component) else { return String(component) }
+                    let digits = component.drop(while: { $0 == "0" })
+                    return digits.isEmpty ? "0" : String(digits)
+                }.joined(separator: ".")
             return PEP440(epoch: epoch, release: release, preRank: preRank, preNumber: preNumber,
-                          devNumber: devNumber, postNumber: postNumber)
+                          devNumber: devNumber, postNumber: postNumber, localVersion: localVersion)
         }
     }
 
@@ -247,7 +262,11 @@ enum VersionRangeMatcher {
         if range.endIncluding != nil && bound(range.endIncluding) == nil { return false }
         if let end = bound(range.endExcluding), compare(version, end) != .orderedAscending { return false }
         if range.endExcluding != nil && bound(range.endExcluding) == nil { return false }
-        if let criteria = criteriaVersionString(criteria), let exact = PEP440.parse(criteria) { return compare(version, exact) == .orderedSame }
+        if let exact = PEP440.parse(criteriaVersionString(criteria)) {
+            guard compare(version, exact) == .orderedSame else { return false }
+            // Exact criteria that specify a local segment also require that segment to match.
+            return exact.localVersion == nil || version.localVersion == exact.localVersion
+        }
         return criteriaHasWildcardVersion(criteria)
     }
 

@@ -69,6 +69,10 @@ final class AdvisoryTests: XCTestCase {
         XCTAssertTrue(matches("1.0.dev1", end: "1.0a1"))
         XCTAssertTrue(matches("1.0.post1.dev1", start: "1.0", end: "1.0.post1"))
         XCTAssertTrue(matches("1.0.post2.dev1", start: "1.0.post1", end: "1.0.post2"))
+        XCTAssertTrue(matches("1.2+vendor.2", exact: "1.2"))
+        XCTAssertTrue(matches("1.2+Vendor-01", exact: "1.2+vendor.1"))
+        XCTAssertFalse(matches("1.2+vendor.2", exact: "1.2+vendor.1"))
+        XCTAssertFalse(matches("1.2", exact: "1.2+vendor.1"))
         XCTAssertFalse(matches("1.0-1", exact: "1.0.1"))
         XCTAssertFalse(matches("1.0_1", end: "2.0"))
         XCTAssertFalse(matches("1.0.post1", end: "1.0.post1"))
@@ -91,6 +95,8 @@ final class AdvisoryTests: XCTestCase {
         XCTAssertTrue(matches("v1.2.3-10", start: "v1.2.3-2", end: "v1.2.3"))
         XCTAssertFalse(matches("v1.2.3-10", start: "v1.2.3-2", end: "v1.2.3-10"))
         XCTAssertFalse(matches("v1.2.3", start: "v1.2.3-10", end: "v1.2.3"))
+        XCTAssertTrue(matches("v1.2.3-100000000000000000000", start: "v1.2.3-99999999999999999999", end: "v1.2.3-alpha"))
+        XCTAssertFalse(matches("v1.2.3-100000000000000000000", start: "v1.2.3-1", end: "v1.2.3-99999999999999999999"))
     }
 
     func testUnavailableArtifactVersionDoesNotMatchNegatedCriteria() {
