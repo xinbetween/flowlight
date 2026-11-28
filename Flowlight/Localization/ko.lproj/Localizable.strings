@@ -1,5 +1,8 @@
 /* Analysis/AnomalyEngine.swift */
 
+/* Software inventory coverage */
+"Packages & Executables" = "패키지 및 실행 파일";
+
 /* Agent advisories */
 "Agent advisories" = "에이전트 권고";
 "Software" = "소프트웨어";

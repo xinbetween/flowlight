@@ -49,6 +49,10 @@ final class AdvisoryInventoryTests: XCTestCase {
         XCTAssertEqual(result.artifacts.first(where: { $0.kind == .homebrewFormula })?.versionEvidence, .homebrewInstallReceipt)
         XCTAssertEqual(result.artifacts.first(where: { $0.kind == .nodePackage })?.versionEvidence, .packageJSON)
         XCTAssertEqual(Set(result.artifacts.map(\.kind)).count, 5)
+        let installed = try XCTUnwrap(result.sources.first { $0.source == L("Packages & Executables") })
+        XCTAssertEqual(installed.discovered, 3)
+        XCTAssertTrue(installed.complete)
+        XCTAssertFalse(result.sources.contains { $0.source == L("Homebrew") || $0.source == L("Executables") })
     }
 
     func testApplicationCopiesWithSameBundleIDRemainSeparateForAdvisories() throws {
@@ -83,6 +87,10 @@ final class AdvisoryInventoryTests: XCTestCase {
         let result = AdvisoryInventoryScanner(configuration: config).scan()
 
         XCTAssertTrue(result.artifacts.filter { $0.kind == .homebrewFormula }.isEmpty)
+        let installed = try XCTUnwrap(result.sources.first { $0.source == L("Packages & Executables") })
+        XCTAssertFalse(installed.complete)
+        XCTAssertEqual(installed.detail, L("One or more Homebrew locations could not be read."))
+        XCTAssertFalse(result.complete)
     }
 
     func testSelectedProjectTraversalReportsMalformedManifestAsIncomplete() throws {

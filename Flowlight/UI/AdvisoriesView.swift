@@ -497,20 +497,30 @@ struct AdvisoriesView: View {
                                          ? "advisories.app.\(row.artifact.identifier)"
                                          : "advisories.artifact.\(row.artifact.id)")
             }
-            .width(min: 190, ideal: 240)
+            .width(min: 150, ideal: 240)
 
             TableColumn(L("Identity")) { row in
                 Text(row.artifact.identifier)
                     .font(.caption.monospaced())
                     .lineLimit(1)
-                    .help(row.artifact.path)
+                    .help(row.artifact.identifier)
             }
-            .width(min: 150, ideal: 220)
+            .width(min: 100, ideal: 160)
+
+            TableColumn(L("Path"), value: \.artifact.path) { row in
+                Text(verbatim: row.artifact.path)
+                    .font(.caption.monospaced())
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(row.artifact.path)
+                    .accessibilityIdentifier("advisories.artifact.path")
+            }
+            .width(min: 130, ideal: 280)
 
             TableColumn(L("Version")) { row in
                 Text(versionText(for: row)).font(.caption).lineLimit(1).help(versionText(for: row))
             }
-            .width(min: 130, ideal: 160)
+            .width(min: 110, ideal: 160)
 
             TableColumn(L("Assessment")) { row in
                 FLPill(text: statusTitle(for: row), systemImage: statusIcon(for: row), color: statusColor(for: row))

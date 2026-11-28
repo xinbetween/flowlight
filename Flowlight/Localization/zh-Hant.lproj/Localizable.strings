@@ -1,5 +1,8 @@
 /* Analysis/AnomalyEngine.swift */
 
+/* Software inventory coverage */
+"Packages & Executables" = "套件與執行檔";
+
 /* Agent advisories */
 "Agent advisories" = "代理安全建議";
 "Software" = "軟體";

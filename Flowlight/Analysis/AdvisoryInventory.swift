@@ -279,12 +279,14 @@ struct AdvisoryInventoryScanner {
         sources.append(appResult.source)
 
         let executableResult = scanExecutables()
-        artifacts.append(contentsOf: executableResult.artifacts)
-        sources.append(executableResult.source)
-
         let homebrewResult = scanHomebrew()
-        artifacts.append(contentsOf: homebrewResult.artifacts)
-        sources.append(homebrewResult.source)
+        let installed = executableResult.artifacts + homebrewResult.artifacts
+        artifacts.append(contentsOf: installed)
+        let installedDetails = [executableResult.detail, homebrewResult.detail].compactMap { $0 }
+        sources.append(AdvisoryInventorySourceResult(
+            source: L("Packages & Executables"), discovered: installed.count,
+            complete: installedDetails.isEmpty, detail: installedDetails.isEmpty ? nil : installedDetails.joined(separator: " ")
+        ))
 
         let packageResult = scanNodePackages()
         artifacts.append(contentsOf: packageResult.artifacts)
@@ -335,7 +337,7 @@ struct AdvisoryInventoryScanner {
             source: L("Applications"), discovered: artifacts.count, complete: complete, detail: detail))
     }
 
-    private func scanExecutables() -> (artifacts: [AdvisoryArtifact], source: AdvisoryInventorySourceResult) {
+    private func scanExecutables() -> (artifacts: [AdvisoryArtifact], detail: String?) {
         var artifacts: [AdvisoryArtifact] = []
         var complete = true
         for root in configuration.executableRoots {
@@ -374,12 +376,10 @@ struct AdvisoryInventoryScanner {
                 complete = false
             }
         }
-        return (artifacts, AdvisoryInventorySourceResult(
-            source: L("Executables"), discovered: artifacts.count, complete: complete,
-            detail: complete ? nil : L("One or more executable locations could not be read.")))
+        return (artifacts, complete ? nil : L("One or more executable locations could not be read."))
     }
 
-    private func scanHomebrew() -> (artifacts: [AdvisoryArtifact], source: AdvisoryInventorySourceResult) {
+    private func scanHomebrew() -> (artifacts: [AdvisoryArtifact], detail: String?) {
         var artifacts: [AdvisoryArtifact] = []
         var complete = true
         var seen = Set<String>()
@@ -476,9 +476,7 @@ struct AdvisoryInventoryScanner {
                 ))
             }
         }
-        return (artifacts, AdvisoryInventorySourceResult(
-            source: L("Homebrew"), discovered: artifacts.count, complete: complete,
-            detail: complete ? nil : L("One or more Homebrew locations could not be read.")))
+        return (artifacts, complete ? nil : L("One or more Homebrew locations could not be read."))
     }
 
     private func readHomebrewReceipt(_ url: URL) -> HomebrewReceiptReadResult {

@@ -1,5 +1,8 @@
 /* Analysis/AnomalyEngine.swift */
 
+/* Software inventory coverage */
+"Packages & Executables" = "パッケージと実行ファイル";
+
 /* Agent advisories */
 "Agent advisories" = "エージェントのアドバイザリ";
 "Software" = "ソフトウェア";
