@@ -92,6 +92,8 @@ struct ContentView: View {
                                    settingsTab: $advisorySettingsTab)
                 }
             }
+            // Keep native navigation sections under the sidebar's own style.
+            .disclosureGroupStyle(FullWidthDisclosureStyle())
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onChange(of: nav.selection) { _, _ in advisorySettingsTab = nil }
             .safeAreaInset(edge: .top, spacing: 0) {

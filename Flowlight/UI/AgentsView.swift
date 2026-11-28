@@ -1281,14 +1281,17 @@ struct ToolActivityRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 6) {
-                outcomeIcon
-                Image(systemName: activity.call.mcpServer == nil ? "wrench.and.screwdriver" : "puzzlepiece.extension")
-                    .foregroundStyle(FL.tool)
-                Text(activity.call.displayName).bold()
-                Spacer()
-                Text(activity.at, format: .dateTime.hour().minute().second()).monospacedDigit().foregroundStyle(.secondary)
+            FullWidthDisclosureHeader(isExpanded: $expanded) {
+                HStack(spacing: 6) {
+                    outcomeIcon
+                    Image(systemName: activity.call.mcpServer == nil ? "wrench.and.screwdriver" : "puzzlepiece.extension")
+                        .foregroundStyle(FL.tool)
+                    Text(activity.call.displayName).bold()
+                    Spacer()
+                    Text(activity.at, format: .dateTime.hour().minute().second()).monospacedDigit().foregroundStyle(.secondary)
+                }
             }
+            .help(expanded ? L("Click to collapse") : L("Click to show more of the command and output"))
             if let summary = activity.call.summary ?? (activity.call.input.isEmpty ? nil : activity.call.input) {
                 Text(summary).font(.caption.monospaced()).foregroundStyle(.primary.opacity(0.85))
                     .lineLimit(expanded ? 12 : 2).textSelection(.enabled)
@@ -1315,9 +1318,6 @@ struct ToolActivityRow: View {
             }
         }
         .font(.caption)
-        .contentShape(Rectangle())
-        .onTapGesture { expanded.toggle() }
-        .help(expanded ? L("Click to collapse") : L("Click to show more of the command and output"))
     }
 
     @ViewBuilder private var outcomeIcon: some View {

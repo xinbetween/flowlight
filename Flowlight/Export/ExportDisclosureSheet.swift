@@ -51,7 +51,10 @@ struct ExportDisclosureSheet: View {
                 }
 
                 Section {
-                    DisclosureGroup(isExpanded: $showFields) {
+                    FullWidthDisclosureHeader(isExpanded: $showFields) {
+                        Text(L("Exactly these %lld fields", disclosure.fieldCount)).font(.headline)
+                    }
+                    if showFields {
                         ForEach(disclosure.items) { item in
                             VStack(alignment: .leading, spacing: 1) {
                                 HStack(spacing: 6) {
@@ -67,8 +70,6 @@ struct ExportDisclosureSheet: View {
                             }
                             .padding(.vertical, 1)
                         }
-                    } label: {
-                        Text(L("Exactly these %lld fields", disclosure.fieldCount)).font(.headline)
                     }
                 } footer: {
                     Text(L("Nothing that HTTPS inspection records can reach an export: no request or response headers, no bodies, no tool calls, no decrypted exchange. Some of the fields listed above travel inside the format's own envelope rather than as a named key, which changes where they appear in your collector, not whether they leave."))

@@ -18,6 +18,7 @@ struct DevicesView: View {
 private struct DevicesContent: View {
     @ObservedObject var store: DeviceStore
     var embedded: Bool
+    @State private var showBluetoothApps = false
 
     @ViewBuilder var body: some View {
         if embedded {
@@ -152,27 +153,35 @@ private struct DevicesContent: View {
     /// Who is built to use the radio. It sits folded away because it is a long list of apps that are merely
     /// capable — the devices above are the ones actually doing something.
     private var bluetoothApps: some View {
-        DisclosureGroup {
-            VStack(alignment: .leading, spacing: 5) {
-                ForEach(store.bluetoothApps) { app in
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(app.name).font(.callout).lineLimit(1)
-                        Text(app.bluetoothPurpose ?? "")
-                            .font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
-                        Spacer(minLength: 0)
-                    }
-                }
-                Text(L("This is each app saying so in its own Info.plist — who asked for Bluetooth, not who macOS granted it to. That second list lives in a database an app can't read, and Flowlight would rather name the difference than blur it."))
-                    .font(.caption2).foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 4)
+        VStack(alignment: .leading, spacing: 0) {
+            FullWidthDisclosureHeader(isExpanded: $showBluetoothApps, horizontalPadding: 12, verticalPadding: 10) {
+                Text(L("%lld apps are built to use Bluetooth", store.bluetoothApps.count))
+                    .font(.caption).foregroundStyle(.secondary)
             }
-            .padding(.top, 8)
-        } label: {
-            Text(L("%lld apps are built to use Bluetooth", store.bluetoothApps.count))
-                .font(.caption).foregroundStyle(.secondary)
+            if showBluetoothApps {
+                bluetoothAppsList
+            }
         }
-        .padding(.horizontal, 12).padding(.vertical, 10)
+    }
+
+    private var bluetoothAppsList: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            ForEach(store.bluetoothApps) { app in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(app.name).font(.callout).lineLimit(1)
+                    Text(app.bluetoothPurpose ?? "")
+                        .font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+            }
+            Text(L("This is each app saying so in its own Info.plist — who asked for Bluetooth, not who macOS granted it to. That second list lives in a database an app can't read, and Flowlight would rather name the difference than blur it."))
+                .font(.caption2).foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 4)
+        }
+        .padding(.leading, 12 + 10 + Spacing.s)
+        .padding(.trailing, 12)
+        .padding(.bottom, 10)
     }
 
     // MARK: USB

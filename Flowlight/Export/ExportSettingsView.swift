@@ -24,6 +24,7 @@ struct ExportSettingsTab: View {
     @State private var headers: [HeaderRow] = []
     @State private var headerError: String?
     @State private var showPreview = false
+    @State private var showFields = false
     @State private var preview = ""
     @State private var loadingPreview = false
     @State private var pendingDisclosure: ExportDisclosure?
@@ -178,7 +179,10 @@ struct ExportSettingsTab: View {
 
     private var fieldsSection: some View {
         Section {
-            DisclosureGroup(L("Every field that can leave this Mac (%lld)", ExportField.allCases.count)) {
+            FullWidthDisclosureHeader(isExpanded: $showFields) {
+                Text(L("Every field that can leave this Mac (%lld)", ExportField.allCases.count))
+            }
+            if showFields {
                 ForEach(ExportField.allCases) { field in
                     VStack(alignment: .leading, spacing: 1) {
                         Text(field.rawValue).font(.caption.monospaced())
