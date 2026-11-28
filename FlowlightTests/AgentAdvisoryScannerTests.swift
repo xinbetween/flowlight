@@ -198,6 +198,8 @@ final class AgentAdvisoryScannerTests: XCTestCase {
               - token: ${TOKEN}
             text: a quoted example of {token: sample-inside-plain-text}
             other: { note: '{password: sample-inside-quoted-text}', token: '$API_TOKEN' }
+            anchored: { description: &docs 'Example, api_key: sample-inside-anchored-description', public: true }
+            tagged: { description: !!str "Example, api_key: sample-inside-tagged-description", public: true }
             description: "The configuration reference shows:
               api_key: sample-inside-multiline-description
               and then continues."

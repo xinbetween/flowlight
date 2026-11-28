@@ -778,7 +778,8 @@ struct AgentAdvisoryScanner {
         (?<=[{,])(?:\s++|\x23[^\r\n]*+)*+
         (?:\#(credentialKey)[\t\x20]*:\s+|(?:"\#(credentialKey)"|'\#(credentialKey)')[\t\x20]*:(?:\s+|(?=["'])))
         (\#(yamlMultilineQuoted)|[^\s\x23"'\[\]{},>|*&!][^\[\]{},\r\n]*+)(?=\s*(?:[,}]|\x23|\z))
-        | \#(yamlMultilineQuoted) | (?:^|(?<=\s))\x23[^\r\n]* | [\[\]{}]
+        | (?:[&!][^\s\[\]{},]+[\t\x20]+)*+\#(yamlMultilineQuoted)
+        | (?:^|(?<=\s))\x23[^\r\n]* | [\[\]{}]
         # Consume ordinary text in one token, so apostrophes or double quotes within it never start a quoted scalar.
         | [^\s\x23"':\[\]{},](?:[^:\x23\[\]{},\r\n]++|:(?![\s\[\]{},]|\z)|(?<!\s)\x23)*+
         """#, options: [.caseInsensitive, .allowCommentsAndWhitespace]
