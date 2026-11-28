@@ -17,7 +17,7 @@ import tarfile
 import tempfile
 import zipfile
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any, Iterable, NoReturn
 
 
 REVIEW_SCHEMA = "flowlight-review-v3"
@@ -545,14 +545,12 @@ def find_reuse(args: argparse.Namespace) -> int:
             )
             receipt = receipt_from_artifact_zip(archive)
         identity = validate_reuse_evidence(selected, artifact, receipt, expected, archive_digest)
-    except (EvidenceError, OSError, subprocess.CalledProcessError, json.JSONDecodeError) as error:
-        print(f"No reusable app evidence: {error}")
+    except (EvidenceError, OSError, subprocess.CalledProcessError, json.JSONDecodeError):
+        # Rejections and subprocess exceptions can contain private upstream values.
+        print("No reusable app evidence. The current run must execute its app jobs.")
         _write_outputs(args.github_output, empty)
         return 0
-    print(
-        f"Reusing directly executed app evidence from run {identity['run_id']} "
-        f"attempt {identity['run_attempt']} artifact {identity['artifact_id']}."
-    )
+    print("Reusing directly executed app evidence.")
     _write_outputs(args.github_output, {
         "reuse": "true",
         "source_run_id": identity["run_id"],
@@ -604,12 +602,18 @@ def consume_pages(args: argparse.Namespace) -> int:
             "source_artifact_id": artifact["id"],
             "source_artifact_digest": artifact["digest"],
         })
-    print(f"Verified Pages artifact {artifact['id']} from source run {run['id']} at current main.")
+    print("Verified the Pages artifact for current main.")
     return 0
 
 
+class EvidenceArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> NoReturn:
+        # argparse's diagnostic may include the original argument values.
+        self.exit(2, "workflow evidence failed: invalid command-line arguments. Use --help for usage.\n")
+
+
 def parser() -> argparse.ArgumentParser:
-    root = argparse.ArgumentParser()
+    root = EvidenceArgumentParser()
     commands = root.add_subparsers(dest="command", required=True)
     reuse = commands.add_parser("find-reuse")
     reuse.add_argument("--repository", required=True)
@@ -636,12 +640,18 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    args = parser().parse_args()
     try:
+        args = parser().parse_args()
         return args.function(args)
-    except (EvidenceError, OSError, subprocess.CalledProcessError, json.JSONDecodeError) as error:
-        print(f"workflow evidence failed: {error}", file=sys.stderr)
-        return 1
+    except (EvidenceError, json.JSONDecodeError):
+        reason = "Evidence or its inputs failed validation."
+    except (OSError, subprocess.SubprocessError):
+        reason = "Could not retrieve, read, or write evidence."
+    except Exception:
+        # At the CLI boundary, fail closed without exposing exception text or a traceback.
+        reason = "Unexpected processing error."
+    print(f"Workflow evidence failed. {reason}", file=sys.stderr)
+    return 1
 
 
 if __name__ == "__main__":
