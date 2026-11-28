@@ -2250,3 +2250,10 @@
 "Showing %lld of %lld destinations." = "显示 %lld 个目标，共 %lld 个。";
 "Showing %lld of %lld tool calls." = "显示 %lld 次工具调用，共 %lld 次。";
 "Partial" = "部分";
+"Mach-O source version (display only)" = "Mach-O 源代码版本（仅供显示）";
+"Recursive home scan · depth %lld · up to %lld entries · system, generated, hidden, and cache folders skipped." = "递归扫描主文件夹 · 深度 %lld · 最多 %lld 个条目 · 跳过系统、构建、隐藏和缓存文件夹。";
+"The home folder was only partially inspected. The scan checks up to %lld entries at depth %lld and skips system, generated, hidden, and cache folders." = "仅检查了主文件夹的一部分。扫描最多检查 %lld 个条目，深度为 %lld，并跳过系统、构建、隐藏和缓存文件夹。";
+"Couldn't save the agent's destination policy: %@" = "无法保存代理的目标地址策略：%@";
+"The agent's destination policy was saved, but Flowlight couldn't fully apply it: %@" = "代理的目标地址策略已保存，但 Flowlight 无法完全应用：%@";
+"Updating policy…" = "正在更新策略…";
+"Partly allowed" = "部分允许";

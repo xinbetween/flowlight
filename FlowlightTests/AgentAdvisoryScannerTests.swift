@@ -39,6 +39,67 @@ final class AgentAdvisoryScannerTests: XCTestCase {
         XCTAssertTrue(result.sources.first?.status == .complete)
     }
 
+    func testNonliteralCredentialValuesDoNotProduceCriticalEvidence() throws {
+        try withFixture { root in
+            try write(#"""
+            {"env": {"API_KEY":"", "ACCESS_KEY":null, "SECRET":" \t ", "PASSWORD":"change-me",
+                     "GITHUB_TOKEN":"${env:GITHUB_TOKEN}", "PRIVATE_KEY":"<YOUR_KEY>", "AUTHORIZATION":"Bearer ${TOKEN}",
+                     "OP_SERVICE_ACCOUNT_TOKEN":"op://Fixture/Item/token"},
+             "mcpServers":{"fixture":{"command":"echo \"api_key\":\"value-inside-command\""}}}
+            """#, to: ".claude/settings.json", under: root)
+            try write(#"""
+            api_key = ""
+            access_key = null
+            secret = " \t "
+            password = 'YOUR_PASSWORD_HERE'
+            token = '$API_TOKEN'
+            authorization = 'Bearer %TOKEN%'
+            private_key = """   """
+            # api_key = "value-inside-comment"
+            notes = '''
+            api_key = "value-inside-notes"
+            '''
+            """#, to: ".codex/config.toml", under: root)
+
+            let scan = AgentAdvisoryScanner(configuration: .init(roots: [root])).scan()
+
+            XCTAssertEqual(scan.sources.first?.filesRead, 2)
+            XCTAssertEqual(scan.settingsInspected, 4)
+            XCTAssertFalse(scan.privateDataAccess)
+            XCTAssertFalse(scan.findings.contains { $0.category == .credentials || $0.severity == .critical })
+            XCTAssertFalse(scan.observedEvidence.contains { $0.category == .credentials || $0.severity == .critical })
+        }
+    }
+
+    func testConfiguredCredentialLiteralsContributeOnlyRedactedEvidence() throws {
+        try withFixture { root in
+            let jsonValue = "synthetic-a92Q1-j"
+            let tomlValue = "synthetic-z70N4-t"
+            let jsonContext = "raw-json-fixture-context"
+            let tomlContext = "raw-toml-fixture-context"
+            try write(#"{"env":{"GITHUB_TOKEN":"\#(jsonValue)"},"note":"\#(jsonContext)"}"#,
+                      to: ".claude/settings.json", under: root)
+            try write(#"""
+            # \#(tomlContext)
+            http_headers = { Authorization = 'Bearer \#(tomlValue)' }
+            """#, to: ".codex/config.toml", under: root)
+
+            let scan = AgentAdvisoryScanner(configuration: .init(roots: [root])).scan()
+            let input = AgentAdvisoryAnalysisInput(result: scan)
+            let credentials = scan.findings.filter { $0.category == .credentials }
+
+            XCTAssertEqual(credentials.map(\.agent), ["claude", "codex"])
+            XCTAssertTrue(credentials.allSatisfy { $0.severity == .critical && $0.hasPrivateDataAccess })
+            XCTAssertTrue(scan.privateDataAccess)
+            XCTAssertEqual(input.evidence.first { $0.category == .credentials }?.count, 2)
+            XCTAssertTrue(input.prompt.contains("category=credentials count=2 severity=4"))
+            for raw in [jsonValue, tomlValue, jsonContext, tomlContext] {
+                XCTAssertFalse(String(reflecting: scan).contains(raw))
+                XCTAssertFalse(input.prompt.contains(raw))
+            }
+        }
+    }
+
     func testSymlinkedAgentFilesAreNotRead() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("agent-advisory-links-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -282,15 +343,29 @@ final class AgentAdvisoryScannerTests: XCTestCase {
 
             let displayLimited = AgentAdvisoryScanner(configuration: .init(roots: [busy, quiet], maximumFindings: 1)).scan()
             XCTAssertTrue(displayLimited.complete)
-            XCTAssertEqual(displayLimited.findings.count, 1)
+            XCTAssertEqual(displayLimited.findings.map(\.category), [.credentials])
+            XCTAssertEqual(displayLimited.findings.map(\.severity), [.critical])
+            XCTAssertEqual(displayLimited.findings.first?.sourceID, displayLimited.sources.last?.id)
             XCTAssertEqual(displayLimited.totalFindingCount, 23)
             XCTAssertEqual(displayLimited.omittedFindings, 22)
             XCTAssertEqual(displayLimited.sources.last?.filesRead, 1)
-            XCTAssertEqual(displayLimited.sources.last?.omittedFindings, 2)
+            XCTAssertEqual(displayLimited.sources.map(\.findings), [0, 1])
+            XCTAssertEqual(displayLimited.sources.map(\.omittedFindings), [21, 1])
             XCTAssertEqual(displayLimited.highestSeverity, .critical)
             XCTAssertTrue(displayLimited.privateDataAccess)
             XCTAssertEqual(displayLimited.observedEvidence.reduce(0) { $0 + $1.count }, 23)
             XCTAssertEqual(displayLimited.inspectedEcosystems, ["claude", "codex"])
+
+            let hidden = AgentAdvisoryScanner(configuration: .init(roots: [busy, quiet], maximumFindings: 0)).scan()
+            XCTAssertTrue(hidden.complete)
+            XCTAssertTrue(hidden.findings.isEmpty)
+            XCTAssertEqual(hidden.sources.map(\.findings), [0, 0])
+            XCTAssertEqual(hidden.sources.map(\.omittedFindings), [21, 2])
+            XCTAssertEqual(hidden.totalFindingCount, 23)
+            XCTAssertEqual(hidden.highestSeverity, .critical)
+            XCTAssertEqual(hidden.observedEvidence, displayLimited.observedEvidence)
+            XCTAssertEqual(hidden.inspectedEcosystems, displayLimited.inspectedEcosystems)
+            XCTAssertEqual(AgentAdvisoryAnalysisInput(result: hidden), AgentAdvisoryAnalysisInput(result: displayLimited))
 
             let byteLimited = AgentAdvisoryScanner(configuration: .init(roots: [busy, quiet],
                                                                           maximumTotalBytes: 2 + quietSettings.utf8.count)).scan()
@@ -298,6 +373,22 @@ final class AgentAdvisoryScannerTests: XCTestCase {
             XCTAssertEqual(byteLimited.sources.last?.bytesRead, quietSettings.utf8.count)
             XCTAssertEqual(byteLimited.truncatedFiles, 0)
             XCTAssertEqual(byteLimited.findings.first(where: { $0.agent == "codex" })?.severity, .critical)
+        }
+    }
+
+    func testDisplayLimitKeepsEarlierTiesWhenDisplacingFindings() throws {
+        try withFixture { parent in
+            let roots = ["first", "second", "third"].map { parent.appendingPathComponent($0, isDirectory: true) }
+            try write("{}", to: ".claude/settings.json", under: roots[0])
+            try write("{}", to: ".claude/settings.json", under: roots[1])
+            try write(#"{"api_key":"synthetic-a91Zk"}"#, to: ".claude/settings.json", under: roots[2])
+
+            let scan = AgentAdvisoryScanner(configuration: .init(roots: roots, maximumFindings: 2)).scan()
+
+            XCTAssertEqual(scan.findings.map(\.severity), [.critical, .low])
+            XCTAssertEqual(scan.findings.map(\.sourceID), [scan.sources[2].id, scan.sources[0].id])
+            XCTAssertEqual(scan.sources.map(\.findings), [1, 0, 1])
+            XCTAssertEqual(scan.sources.map(\.omittedFindings), [0, 1, 1])
         }
     }
 

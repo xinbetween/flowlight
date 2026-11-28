@@ -54,11 +54,23 @@ struct AgentInspectionDiagnostics: Sendable, Equatable {
 }
 
 struct AgentInventoryPolicyCoverage: Sendable, Equatable {
+    enum DestinationStatus: Equatable {
+        case allowed, mixed, notAllowed
+    }
+
     var enabled: Bool
     var enforcing: Bool
-    var uncoveredDestinations: Int
     var isPartial = false
     var uncoveredKeys: Set<String> = []
+    /// Only visible destinations need an allowed bit to distinguish a mixed row from a fully disallowed one.
+    var allowedVisibleKeys: Set<String> = []
+    var uncoveredDestinations: Int { uncoveredKeys.count }
+
+    func status(for destination: AgentDestination) -> DestinationStatus? {
+        let key = destination.policyKey
+        if uncoveredKeys.contains(key) { return allowedVisibleKeys.contains(key) ? .mixed : .notAllowed }
+        return allowedVisibleKeys.contains(key) ? .allowed : nil
+    }
 }
 
 struct AgentInventoryItem: Identifiable, Sendable, Equatable {
@@ -231,16 +243,19 @@ enum AgentInventoryBuilder {
                 providers[provider.name, default: FlowCounters()] += provider.counters
             }
             for destination in summary.destinations {
-                var merged = destinations[destination.id] ?? destination
-                if destinations[destination.id] != nil {
+                let key = destination.policyKey
+                if var merged = destinations.removeValue(forKey: key) {
+                    if merged.endpoints.isEmpty { merged.endpoints = merged.representedEndpoints }
+                    merged.endpoints.formUnion(destination.representedEndpoints)
                     merged.counters += destination.counters
                     merged.protocols = Array(Set(merged.protocols + destination.protocols)).sorted()
                     merged.ports = mergedPorts(merged.ports, destination.ports)
                     merged.via = Array(Set(merged.via + destination.via)).sorted()
                     if merged.provider == nil { merged.provider = destination.provider }
-                    merged.hasHostname = merged.hasHostname || destination.hasHostname
+                    destinations[key] = merged
+                } else {
+                    destinations[key] = destination
                 }
-                destinations[destination.id] = merged
             }
             for tool in summary.tools {
                 var merged = tools[tool.id] ?? tool
@@ -450,30 +465,40 @@ enum AgentInventoryBuilder {
     private static func policyCoverage(identityPriority: [String], summary: AgentSummary?, roots: [String],
                                        input: AgentInventoryInput) -> AgentInventoryPolicyCoverage {
         guard let policy = AgentPolicy.resolve(input.policies.values, identities: identityPriority), policy.enabled else {
-            return AgentInventoryPolicyCoverage(enabled: false, enforcing: false, uncoveredDestinations: 0)
+            return AgentInventoryPolicyCoverage(enabled: false, enforcing: false)
         }
-        var uncovered = Set<String>()
+        let destinations = summary?.destinations ?? []
+        let visibleKeys = Set(destinations.map(\.policyKey))
+        var coverage = AgentInventoryPolicyCoverage(
+            enabled: true, enforcing: policy.enforce,
+            isPartial: input.policyEndpoints == nil && (summary?.omittedRelationships ?? 0) > 0
+        )
+        func evaluate(key: String, host: String, ip: String, isProvider: Bool) {
+            let visible = visibleKeys.contains(key)
+            if coverage.uncoveredKeys.contains(key), !visible || coverage.allowedVisibleKeys.contains(key) { return }
+            if policy.allows(host: host, ip: ip, isAIProvider: isProvider) {
+                if visible { coverage.allowedVisibleKeys.insert(key) }
+            } else {
+                coverage.uncoveredKeys.insert(key)
+            }
+        }
         if let full = input.policyEndpoints {
             for root in roots {
                 for endpoint in full[root] ?? [] {
-                    if input.cancellation?.isCancelled == true { break }
-                    let key = endpoint.destinationKey
-                    if !uncovered.contains(key), !policy.allows(host: endpoint.host, ip: endpoint.ip,
-                                                                isAIProvider: endpoint.isProvider) {
-                        uncovered.insert(key)
-                    }
+                    if input.cancellation?.isCancelled == true { return coverage }
+                    evaluate(key: endpoint.destinationKey, host: endpoint.host, ip: endpoint.ip,
+                             isProvider: endpoint.isProvider)
                 }
             }
         } else {
-            for destination in summary?.destinations ?? [] where !policy.allows(
-                host: destination.hasHostname ? destination.label : "", ip: destination.ip,
-                isAIProvider: destination.provider != nil
-            ) { uncovered.insert(destination.policyKey) }
+            for destination in destinations {
+                for endpoint in destination.representedEndpoints {
+                    evaluate(key: destination.policyKey, host: destination.policyHost, ip: endpoint.ip,
+                             isProvider: endpoint.isProvider)
+                }
+            }
         }
-        return AgentInventoryPolicyCoverage(enabled: true, enforcing: policy.enforce,
-                                            uncoveredDestinations: uncovered.count,
-                                            isPartial: input.policyEndpoints == nil && (summary?.omittedRelationships ?? 0) > 0,
-                                            uncoveredKeys: uncovered)
+        return coverage
     }
 
     private static func health(observed: Bool, installed: Bool, configured: Bool, monitored: Bool,

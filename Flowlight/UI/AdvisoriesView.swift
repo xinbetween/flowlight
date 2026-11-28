@@ -565,6 +565,7 @@ struct AdvisoriesView: View {
         case .packageJSON: return L("package.json")
         case .packageMetadata: return L("Package metadata")
         case .executableMetadata: return L("Executable metadata")
+        case .machOSourceVersion: return L("Mach-O source version (display only)")
         case .executableVersionProbe: return L("Executable version output")
         case nil: return L("path only")
         }
@@ -762,6 +763,7 @@ private struct AdvisoryDetailView: View {
         case .packageJSON: return L("package.json")
         case .packageMetadata: return L("Package metadata")
         case .executableMetadata: return L("Executable metadata")
+        case .machOSourceVersion: return L("Mach-O source version (display only)")
         case .executableVersionProbe: return L("Executable version output")
         case nil: return L("identity/path only")
         }

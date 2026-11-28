@@ -2251,3 +2251,10 @@
 "Showing %lld of %lld destinations." = "宛先を%lld件（全%lld件）表示しています。";
 "Showing %lld of %lld tool calls." = "ツール呼び出しを%lld件（全%lld件）表示しています。";
 "Partial" = "一部";
+"Mach-O source version (display only)" = "Mach-O ソースバージョン（表示のみ）";
+"Recursive home scan · depth %lld · up to %lld entries · system, generated, hidden, and cache folders skipped." = "ホームフォルダの再帰スキャン · 深さ %lld · 最大 %lld 項目 · システム、ビルド、隠し、キャッシュフォルダを除外。";
+"The home folder was only partially inspected. The scan checks up to %lld entries at depth %lld and skips system, generated, hidden, and cache folders." = "ホームフォルダの一部を確認しました。スキャンでは最大 %lld 項目を深さ %lld まで確認し、システム、ビルド、隠し、キャッシュフォルダを除外します。";
+"Couldn't save the agent's destination policy: %@" = "エージェントの接続先ポリシーを保存できませんでした：%@";
+"The agent's destination policy was saved, but Flowlight couldn't fully apply it: %@" = "エージェントの接続先ポリシーは保存されましたが、Flowlight で完全に適用できませんでした：%@";
+"Updating policy…" = "ポリシーを更新中…";
+"Partly allowed" = "一部許可";

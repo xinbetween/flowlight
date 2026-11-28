@@ -61,7 +61,7 @@ struct AgentsView: View {
     @State private var requestedScope: LoadScope?
     @State private var reloader = AgentsReloadCoordinator<LoadScope>()
     @State private var loadStatus = LoadStatus.loading
-    @State private var policyEdits: [String: AgentPolicy] = [:]
+    @State private var policyEdits = AgentPolicyEdits()
     @ObservedObject private var workspaceStore = AgentWorkspaceStore.shared
     @State private var selection: AgentInventoryItem.ID?
     @State private var policyDeepLink = AgentPolicyDeepLinkState()
@@ -138,21 +138,25 @@ struct AgentsView: View {
                 table.frame(minHeight: 180, maxHeight: max(180, CGFloat(inventory.count) * 42 + 44))
                 if let item = selectedItem {
                     let selected = detailSummary(for: item)
+                    let policy = policy(for: item)
                     AgentDetail(agent: selected, window: window, toolCalls: snapshot.inspection.toolUsage[item.id] ?? [],
                                 activity: snapshot.inspection.activity[item.id] ?? [],
                                 servers: snapshot.inspection.mcpServers[item.id] ?? [],
                                 profile: snapshot.inspection.profiles[item.id],
                                 inspected: snapshot.inspection.inspectedAgents.contains(item.id),
                                 workspaces: detailWorkspaces(for: item),
-                                policy: policy(for: item), policyCoverage: item.policy,
+                                policy: policy, policyCoverage: item.policy,
                                 inspectionDetailLimited: coverage.inspectionExchangesLimited,
-                                policyUpdatePending: policyEdits[policy(for: item).agentID] != nil,
+                                policyUpdatePending: policyEdits.hasOverlay(for: policy.agentID),
+                                policySaving: policyEdits.isSaving(policy.agentID),
                                 historyFilter: historyFilter(for: item),
                                 requestedPolicySection: policyDeepLink.section(for: item.identities),
                                 requestedGuardrailID: policyDeepLink.guardrailID(for: item.identities),
                                 consumeRequestedPolicySection: { policyDeepLink.consume() }) { policy in
-                        policyEdits[policy.agentID] = policy
-                        monitor.savePolicy(policy)
+                        guard let token = policyEdits.begin(policy) else { return }
+                        monitor.savePolicy(policy) { result in
+                            policyEdits.finish(result, agentID: policy.agentID, token: token)
+                        }
                     }
                     .id(item.id)
                 }
@@ -235,9 +239,10 @@ struct AgentsView: View {
             }
             .width(65)
             TableColumn(L("Policy")) { item in
-                Text(policyLabel(item.policy)).font(.caption).foregroundStyle(selection == item.id
-                    ? Color.primary
-                    : (item.policy.uncoveredDestinations > 0 ? TrafficColors.anomaly : .secondary))
+                let updating = policyEdits.hasOverlay(for: policy(for: item).agentID)
+                Text(updating ? L("Updating policy…") : policyLabel(item.policy))
+                    .font(.caption).foregroundStyle(selection == item.id ? Color.primary
+                        : (!updating && item.policy.uncoveredDestinations > 0 ? TrafficColors.anomaly : .secondary))
             }
             .width(60)
             TableColumn(L("Alerts"), value: \.unresolvedAlerts) { item in
@@ -357,10 +362,10 @@ struct AgentsView: View {
                                guardrailIDs: monitor.guardrails.guardrails.map(\.agent)))
     }
 
-    private func publishInventory(_ result: AgentsViewSnapshot, scope: LoadScope) {
+    private func publishInventory(_ result: AgentsViewSnapshot, scope: LoadScope, policyRevision: Int) {
         snapshot = result
         publishedScope = scope
-        policyEdits = policyEdits.filter { result.policies[$0.key] != $0.value }
+        policyEdits.reconcile(snapshotRevision: policyRevision)
         if !result.inventory.contains(where: { $0.id == selection }) { selection = result.inventory.first?.id }
         resolvePolicyDeepLink()
     }
@@ -386,8 +391,8 @@ struct AgentsView: View {
     }
 
     private func policy(for item: AgentInventoryItem) -> AgentPolicy {
-        AgentPolicy.resolve(snapshot.policies.merging(policyEdits) { _, edit in edit }.values,
-                            identities: item.identities) ?? AgentPolicy(agentID: item.id, enabled: false)
+        policyEdits.resolved(over: snapshot.policies, identities: item.identities)
+            ?? AgentPolicy(agentID: item.id, enabled: false)
     }
 
     private func historyFilter(for item: AgentInventoryItem) -> TrafficFilter {
@@ -421,6 +426,7 @@ struct AgentsView: View {
             let granularity = key.scope.window.granularity
             let focusScope = key.scope.focus
             let stress = DemoData.isAgentsStress
+            let policyRevision = monitor.agentPolicyRevision
             // A mounted Agents page can be waiting on its first snapshot or a refresh while macOS
             // throttles the app. Mark only the in-flight load as user-facing and still allow system sleep.
             let activity = ProcessInfo.processInfo.beginActivity(options: .userInitiatedAllowingIdleSystemSleep,
@@ -465,9 +471,10 @@ struct AgentsView: View {
             } catch {
                 // The scope guard also covers a new view update before the onChange callback has run.
             }
-            guard !cancellation.isCancelled, requestedScope == key.scope, scope == key.scope else { return }
+            guard !cancellation.isCancelled, requestedScope == key.scope, scope == key.scope,
+                  policyRevision == monitor.agentPolicyRevision else { return }
             if let result {
-                publishInventory(result, scope: key.scope)
+                publishInventory(result, scope: key.scope, policyRevision: policyRevision)
                 if scanApps { lastInstalledAppScan = to }
                 loadStatus = .ready
                 disposition = "published"
@@ -723,41 +730,6 @@ struct RiskBadges: View {
     }
 }
 
-extension AgentDestination {
-    func isAllowed(by policy: AgentPolicy) -> Bool {
-        policy.allows(host: hasHostname ? label : "", ip: ip, isAIProvider: provider != nil)
-    }
-
-    /// What "Allow" adds: the registrable domain, or the IP when no hostname was seen.
-    var allowPattern: String { hasHostname ? AnomalyEngine.registrableDomain(label) : ip }
-}
-
-/// Table cell: whether an allowlist is on, and how many destinations break it.
-struct AllowlistStatus: View {
-    var agent: AgentSummary
-    var policy: AgentPolicy?
-
-    var body: some View {
-        if let policy, policy.enabled {
-            let violations = agent.otherDestinations.filter { !$0.isAllowed(by: policy) }.count
-            HStack(spacing: 4) {
-                if violations > 0 {
-                    Label(L("%lld not allowed", violations), systemImage: "xmark.octagon.fill")
-                        .font(.caption.bold()).foregroundStyle(TrafficColors.anomaly)
-                } else {
-                    Label(L("All allowed"), systemImage: "checkmark.seal.fill").font(.caption).foregroundStyle(FL.good)
-                }
-                if policy.enforce {
-                    Image(systemName: "shield.lefthalf.filled").font(.caption2).foregroundStyle(FL.warning)
-                        .help(L("Unlisted destinations are refused, not only reported"))
-                }
-            }
-        } else {
-            Text(L("Off")).font(.caption).foregroundStyle(.secondary)
-        }
-    }
-}
-
 /// Edits one agent's allowlist: on/off, AI providers, blocking, patterns, presets.
 struct AllowlistEditor: View {
     @EnvironmentObject var monitor: TrafficMonitor
@@ -872,9 +844,10 @@ struct AgentDetail: View {
     var inspected = false
     var workspaces: [AgentWorkspace] = []
     var policy: AgentPolicy
-    var policyCoverage: AgentInventoryPolicyCoverage? = nil
+    var policyCoverage: AgentInventoryPolicyCoverage
     var inspectionDetailLimited = false
     var policyUpdatePending = false
+    var policySaving = false
     var historyFilter: TrafficFilter
     var requestedPolicySection: AgentPolicySection?
     var requestedGuardrailID: UUID? = nil
@@ -957,6 +930,7 @@ struct AgentDetail: View {
                     }
                     Divider().padding(.vertical, 2)
                     AllowlistEditor(agentName: agent.name, policy: policy, save: save)
+                        .disabled(policySaving)
                 }
                 .frame(width: 220, alignment: .leading)
 
@@ -984,27 +958,35 @@ struct AgentDetail: View {
                     }
                     switch tab {
                     case .destinations:
-                        if policy.enabled && !policyUpdatePending, let policyCoverage {
-                            Text(policyCoverage.isPartial ? L("Destination policy coverage is partial.")
-                                 : policyCoverage.uncoveredDestinations > 0
-                                 ? L("%lld observed destinations are outside its policy.", policyCoverage.uncoveredDestinations)
-                                 : L("All allowed"))
-                                .font(.caption)
-                                .foregroundStyle(policyCoverage.uncoveredDestinations > 0 ? TrafficColors.anomaly : .secondary)
+                        let destinations = reviewDestinations
+                        if policyUpdatePending {
+                            Text(L("Updating policy…")).font(.caption).foregroundStyle(.secondary)
+                        } else if policy.enabled {
+                            if policyCoverage.isPartial {
+                                Text(L("Destination policy coverage is partial.")).font(.caption).foregroundStyle(FL.warning)
+                            }
+                            if policyCoverage.uncoveredDestinations > 0 {
+                                Text(policyCoverage.uncoveredDestinations == 1
+                                     ? L("One observed destination is outside its policy.")
+                                     : L("%lld observed destinations are outside its policy.", policyCoverage.uncoveredDestinations))
+                                    .font(.caption).foregroundStyle(TrafficColors.anomaly)
+                            } else if !policyCoverage.isPartial {
+                                Text(L("All allowed")).font(.caption).foregroundStyle(.secondary)
+                            }
                         }
-                        if agent.otherDestinations.isEmpty && agent.omittedRelationships == 0 {
+                        if destinations.isEmpty && agent.omittedRelationships == 0 {
                             Text(agent.providers.isEmpty
                                  ? L("No traffic was observed in the selected window.")
                                  : L("Only AI providers. Nothing else was contacted."))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
-                        if agent.otherDestinations.count > 50 {
-                            Text(L("Showing %lld of %lld destinations.", 50, agent.otherDestinations.count))
+                        if destinations.count > 50 {
+                            Text(L("Showing %lld of %lld destinations.", 50, destinations.count))
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         ScrollView {
                             LazyVStack(spacing: 3) {
-                                ForEach(agent.otherDestinations.prefix(50)) { destination in
+                                ForEach(destinations.prefix(50)) { destination in
                                     destinationRow(destination)
                                 }
                             }
@@ -1138,8 +1120,16 @@ struct AgentDetail: View {
             .controlSize(.small)
     }
 
+    private var reviewDestinations: [AgentDestination] {
+        guard policy.enabled else { return agent.otherDestinations }
+        return agent.destinations.sorted { lhs, rhs in
+            policyCoverage.uncoveredKeys.contains(lhs.policyKey) && !policyCoverage.uncoveredKeys.contains(rhs.policyKey)
+        }
+    }
+
     @ViewBuilder private var detailTabOptions: some View {
-        Text(L("Destinations (%lld)", agent.otherDestinations.count)).tag(Tab.destinations)
+        let destinationCount = policy.enabled ? agent.destinations.count : agent.otherDestinations.count
+        Text(L("Destinations (%lld)", destinationCount)).tag(Tab.destinations)
         Text(activity.isEmpty ? L("Tool calls") : L("Tool calls (%lld)", activity.count)).tag(Tab.calls)
         Text(toolCount > 0 ? L("Tools (%lld)", toolCount) : L("Tools")).tag(Tab.tools)
         let mcpCount = servers.count + unusedServers.count
@@ -1237,16 +1227,18 @@ struct AgentDetail: View {
                     .help(L("Opened by %@", d.via.joined(separator: ", ")))
             }
             Spacer()
-            if policy.enabled && !policyUpdatePending && (policyCoverage?.uncoveredKeys.contains(d.policyKey)
-                ?? !d.isAllowed(by: policy)) {
-                Text(L("Not allowed")).font(.caption2.bold()).foregroundStyle(TrafficColors.anomaly)
-                Button(L("Allow")) {
-                    var p = policy
-                    if !p.patterns.contains(d.allowPattern) { p.patterns.append(d.allowPattern) }
-                    save(p)
+            if policy.enabled && !policyUpdatePending, let status = policyCoverage.status(for: d), status != .allowed {
+                Text(status == .mixed ? L("Partly allowed") : L("Not allowed"))
+                    .font(.caption2.bold()).foregroundStyle(TrafficColors.anomaly)
+                if !d.allowPattern.isEmpty && !policy.patterns.contains(d.allowPattern) {
+                    Button(L("Allow")) {
+                        var p = policy
+                        p.patterns.append(d.allowPattern)
+                        save(p)
+                    }
+                    .controlSize(.mini)
+                    .help(L("Add %@ to %@'s allowlist", d.allowPattern, agent.name))
                 }
-                .controlSize(.mini)
-                .help(L("Add %@ to %@'s allowlist", d.allowPattern, agent.name))
             }
             Text("↑ \(ByteFormat.string(d.counters.bytesOut))  ↓ \(ByteFormat.string(d.counters.bytesIn))").monospacedDigit().foregroundStyle(.secondary)
         }

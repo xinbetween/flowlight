@@ -52,22 +52,40 @@ struct ExecutableVersionProbe: Sendable {
     typealias Runner = @Sendable (URL, [String], Configuration) async -> RawResult
     typealias PathValidator = @Sendable (URL) -> Bool
 
-    /// Reads only bounded, authoritative version metadata embedded in a native binary or recognized script.
-    /// This never executes the file and intentionally does not infer versions from names or paths.
-    static func metadataVersion(at url: URL, maximumBytes: Int = 1 * 1024 * 1024) -> String? {
+    struct MetadataVersion: Equatable {
+        let version: String
+        let evidence: AdvisoryVersionEvidence
+    }
+
+    /// Reads bounded version metadata without executing the file. Prefer product metadata to the
+    /// linker-provided source version, which can describe an unrelated build train.
+    static func metadataVersion(at url: URL, maximumBytes: Int = 1 * 1024 * 1024) -> MetadataVersion? {
         metadataVersion(at: url, maximumBytes: maximumBytes, depth: 0)
     }
 
-    private static func metadataVersion(at url: URL, maximumBytes: Int, depth: Int) -> String? {
-        guard depth < 2, maximumBytes > 0,
-              let data = boundedFileData(at: url, maximumBytes: maximumBytes) else { return nil }
-        if let version = machOSourceVersion(in: data) { return version }
-        if let version = scriptVersion(in: data) { return version }
-        if let target = scriptTargetURL(in: data),
-           let version = metadataVersion(at: target, maximumBytes: maximumBytes, depth: depth + 1) {
-            return version
+    private static func metadataVersion(at url: URL, maximumBytes: Int, depth: Int) -> MetadataVersion? {
+        guard depth < 2, maximumBytes > 0, let file = MetadataFile(at: url) else { return nil }
+        defer { close(file.descriptor) }
+        if let version = bundleVersion(at: url, maximumBytes: maximumBytes) {
+            return MetadataVersion(version: version, evidence: .executableMetadata)
         }
-        return bundleVersion(at: url, maximumBytes: maximumBytes)
+
+        let headerSize = Int(min(file.size, UInt64(min(8, maximumBytes))))
+        guard let header = file.read(at: 0, count: headerSize) else { return nil }
+        if header.starts(with: [0x23, 0x21]) {
+            let length = Int(min(file.size, UInt64(maximumBytes)))
+            guard let remainder = file.read(at: UInt64(headerSize), count: length - headerSize) else { return nil }
+            let data = header + remainder
+            if let version = scriptVersion(in: data) {
+                return MetadataVersion(version: version, evidence: .executableMetadata)
+            }
+            if let target = scriptTargetURL(in: data) {
+                return metadataVersion(at: target, maximumBytes: maximumBytes, depth: depth + 1)
+            }
+            return nil
+        }
+        guard let version = machOSourceVersion(in: file, header: header, remainingBytes: maximumBytes - headerSize) else { return nil }
+        return MetadataVersion(version: version, evidence: .machOSourceVersion)
     }
 
     private let configuration: Configuration
@@ -87,30 +105,50 @@ struct ExecutableVersionProbe: Sendable {
     }
 
     private static let machoSourceVersionCommand: UInt32 = 0x2a
-    private static let machoMagic32: Set<UInt32> = [0xfeedface, 0xcefaedfe]
-    private static let machoMagic64: Set<UInt32> = [0xfeedfacf, 0xcffaedfe]
+    private static let machoMagic32: UInt32 = 0xfeedface
+    private static let machoMagic64: UInt32 = 0xfeedfacf
+    #if arch(arm64)
+    private static let preferredCPUs: [UInt32] = [0x0100000c, 0x01000007]
+    #else
+    private static let preferredCPUs: [UInt32] = [0x01000007, 0x0100000c]
+    #endif
+
+    private struct MetadataFile {
+        let descriptor: Int32
+        let size: UInt64
+
+        init?(at url: URL) {
+            let descriptor = Darwin.open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
+            guard descriptor >= 0 else { return nil }
+            var info = stat()
+            guard fstat(descriptor, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG, info.st_size >= 0 else {
+                close(descriptor)
+                return nil
+            }
+            self.descriptor = descriptor
+            size = UInt64(info.st_size)
+        }
+
+        func read(at offset: UInt64, count: Int) -> Data? {
+            guard count >= 0, offset <= size, UInt64(count) <= size - offset else { return nil }
+            var data = Data(count: count)
+            var copied = 0
+            while copied < count {
+                let length = data.withUnsafeMutableBytes { (buffer: UnsafeMutableRawBufferPointer) in
+                    pread(descriptor, buffer.baseAddress?.advanced(by: copied), count - copied, off_t(offset + UInt64(copied)))
+                }
+                if length < 0, errno == EINTR { continue }
+                guard length > 0 else { return nil }
+                copied += length
+            }
+            return data
+        }
+    }
 
     private static func boundedFileData(at url: URL, maximumBytes: Int) -> Data? {
-        let descriptor = Darwin.open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
-        guard descriptor >= 0 else { return nil }
-        defer { _ = Darwin.close(descriptor) }
-
-        var info = stat()
-        guard fstat(descriptor, &info) == 0,
-              (info.st_mode & S_IFMT) == S_IFREG else { return nil }
-
-        var data = Data()
-        data.reserveCapacity(min(maximumBytes, 16 * 1024))
-        var buffer = [UInt8](repeating: 0, count: 16 * 1024)
-        while data.count < maximumBytes {
-            let requested = min(buffer.count, maximumBytes - data.count)
-            let count = buffer.withUnsafeMutableBytes { bytes in
-                Darwin.read(descriptor, bytes.baseAddress, requested)
-            }
-            guard count > 0 else { break }
-            data.append(contentsOf: buffer[0..<Int(count)])
-        }
-        return data
+        guard let file = MetadataFile(at: url) else { return nil }
+        defer { close(file.descriptor) }
+        return file.read(at: 0, count: Int(min(file.size, UInt64(maximumBytes))))
     }
 
     private static func readUInt32(_ data: Data, at offset: Int, littleEndian: Bool) -> UInt32? {
@@ -136,95 +174,98 @@ struct ExecutableVersionProbe: Sendable {
         return result
     }
 
-    private static func machOSourceVersion(in data: Data) -> String? {
-        guard data.count >= 4 else { return nil }
-        let littleMagic = readUInt32(data, at: 0, littleEndian: true)
-        let bigMagic = readUInt32(data, at: 0, littleEndian: false)
-        if let magic = bigMagic, [0xcafebabe, 0xcafebabf].contains(magic) {
-            return fatSourceVersion(in: data, littleEndian: false, is64: magic == 0xcafebabf)
-        }
-        if let magic = littleMagic, [0xcafebabe, 0xcafebabf].contains(magic) {
-            return fatSourceVersion(in: data, littleEndian: true, is64: magic == 0xcafebabf)
-        }
-        return machOSourceVersion(in: data, offset: 0)
+    private struct MachOSlice {
+        let offset: UInt64
+        let size: UInt64
+        let cpu: UInt32?
     }
 
-    private static func fatSourceVersion(in data: Data, littleEndian: Bool, is64: Bool) -> String? {
-        guard let count = readUInt32(data, at: 4, littleEndian: littleEndian), count <= 32 else { return nil }
+    private static func machOSourceVersion(in file: MetadataFile, header: Data, remainingBytes: Int) -> String? {
+        let fat32: UInt32 = 0xcafebabe
+        let fat64: UInt32 = 0xcafebabf
+        for littleEndian in [false, true] {
+            if let magic = readUInt32(header, at: 0, littleEndian: littleEndian), magic == fat32 || magic == fat64 {
+                return fatSourceVersion(in: file, header: header, remainingBytes: remainingBytes,
+                                        littleEndian: littleEndian, is64: magic == fat64)
+            }
+        }
+        return thinSourceVersion(in: file, slice: MachOSlice(offset: 0, size: file.size, cpu: nil),
+                                 prefix: header, remainingBytes: remainingBytes)
+    }
+
+    private static func fatSourceVersion(in file: MetadataFile, header: Data, remainingBytes: Int,
+                                         littleEndian: Bool, is64: Bool) -> String? {
+        guard let count = readUInt32(header, at: 4, littleEndian: littleEndian), (1...32).contains(count) else { return nil }
         let entrySize = is64 ? 32 : 20
-        let preferredCPUTypes: [UInt32] = {
-            #if arch(arm64)
-            return [0x0100000c, 0x01000007]
-            #else
-            return [0x01000007, 0x0100000c]
-            #endif
-        }()
-        var fallback: (offset: Int, size: Int)?
-        for index in 0..<Int(count) {
-            let entry = 8 + index * entrySize
-            guard let cpuType = readUInt32(data, at: entry, littleEndian: littleEndian) else { continue }
-            let rawOffset: UInt64?
-            let rawSize: UInt64?
-            if is64 {
-                rawOffset = readUInt64(data, at: entry + 8, littleEndian: littleEndian)
-                rawSize = readUInt64(data, at: entry + 16, littleEndian: littleEndian)
-            } else {
-                rawOffset = readUInt32(data, at: entry + 8, littleEndian: littleEndian).map(UInt64.init)
-                rawSize = readUInt32(data, at: entry + 12, littleEndian: littleEndian).map(UInt64.init)
-            }
-            guard let rawOffset, let rawSize,
-                  rawOffset <= UInt64(data.count), rawSize <= UInt64(data.count) - rawOffset,
-                  rawOffset <= UInt64(Int.max), rawSize <= UInt64(Int.max) else { continue }
-            let candidate = (offset: Int(rawOffset), size: Int(rawSize))
-            if fallback == nil { fallback = candidate }
-            if preferredCPUTypes.contains(cpuType) {
-                return machOSourceVersion(in: data, offset: candidate.offset, maximumSize: candidate.size)
-            }
+        let tableBytes = Int(count) * entrySize
+        let tableEnd = UInt64(8 + tableBytes)
+        guard tableBytes <= remainingBytes,
+              let table = file.read(at: 8, count: tableBytes) else { return nil }
+        var slices: [MachOSlice] = []
+        for entry in stride(from: 0, to: tableBytes, by: entrySize) {
+            let offset = is64 ? readUInt64(table, at: entry + 8, littleEndian: littleEndian)
+                : readUInt32(table, at: entry + 8, littleEndian: littleEndian).map(UInt64.init)
+            let size = is64 ? readUInt64(table, at: entry + 16, littleEndian: littleEndian)
+                : readUInt32(table, at: entry + 12, littleEndian: littleEndian).map(UInt64.init)
+            guard let offset, let size, offset >= tableEnd, offset <= file.size,
+                  size >= 28, size <= file.size - offset,
+                  let cpu = readUInt32(table, at: entry, littleEndian: littleEndian) else { return nil }
+            slices.append(MachOSlice(offset: offset, size: size, cpu: cpu))
         }
-        guard let fallback else { return nil }
-        return machOSourceVersion(in: data, offset: fallback.offset, maximumSize: fallback.size)
+        let orderedRanges = slices.sorted { $0.offset < $1.offset }
+        guard zip(orderedRanges, orderedRanges.dropFirst()).allSatisfy({ $0.offset + $0.size <= $1.offset }),
+              let selected = preferredCPUs.lazy.compactMap({ cpu in slices.first { $0.cpu == cpu } }).first ?? slices.first,
+              remainingBytes - tableBytes >= 4,
+              let prefix = file.read(at: selected.offset, count: 4) else { return nil }
+        return thinSourceVersion(in: file, slice: selected, prefix: prefix, remainingBytes: remainingBytes - tableBytes - 4)
     }
 
-    private static func machOSourceVersion(in data: Data, offset: Int, maximumSize: Int? = nil) -> String? {
-        guard offset >= 0, offset + 4 <= data.count else { return nil }
-        let littleMagic = readUInt32(data, at: offset, littleEndian: true)
-        let bigMagic = readUInt32(data, at: offset, littleEndian: false)
+    private static func thinSourceVersion(in file: MetadataFile, slice: MachOSlice, prefix: Data,
+                                          remainingBytes: Int) -> String? {
         let littleEndian: Bool
-        let headerSize: Int
-        if let magic = littleMagic, machoMagic64.contains(magic) {
-            littleEndian = true; headerSize = 32
-        } else if let magic = bigMagic, machoMagic64.contains(magic) {
-            littleEndian = false; headerSize = 32
-        } else if let magic = littleMagic, machoMagic32.contains(magic) {
-            littleEndian = true; headerSize = 28
-        } else if let magic = bigMagic, machoMagic32.contains(magic) {
-            littleEndian = false; headerSize = 28
+        let magic: UInt32
+        if let value = readUInt32(prefix, at: 0, littleEndian: true), value == machoMagic64 || value == machoMagic32 {
+            littleEndian = true
+            magic = value
+        } else if let value = readUInt32(prefix, at: 0, littleEndian: false), value == machoMagic64 || value == machoMagic32 {
+            littleEndian = false
+            magic = value
         } else {
             return nil
         }
-        guard let commandCount = readUInt32(data, at: offset + 16, littleEndian: littleEndian), commandCount <= 4096,
-              let commandBytes = readUInt32(data, at: offset + 20, littleEndian: littleEndian),
-              Int(commandBytes) <= data.count - offset - headerSize else { return nil }
-        let commandEnd = offset + headerSize + Int(commandBytes)
-        if let maximumSize, commandEnd > offset + maximumSize { return nil }
-        var commandOffset = offset + headerSize
+        let headerSize = magic == machoMagic64 ? 32 : 28
+        let remainingHeaderBytes = headerSize - prefix.count
+        guard UInt64(headerSize) <= slice.size, remainingHeaderBytes <= remainingBytes,
+              let headerTail = file.read(at: slice.offset + UInt64(prefix.count), count: remainingHeaderBytes) else { return nil }
+        let header = prefix + headerTail
+        if let cpu = slice.cpu, readUInt32(header, at: 4, littleEndian: littleEndian) != cpu { return nil }
+        guard let commandCount = readUInt32(header, at: 16, littleEndian: littleEndian), commandCount <= 4096,
+              let commandBytes = readUInt32(header, at: 20, littleEndian: littleEndian),
+              commandBytes >= commandCount * 8,
+              UInt64(commandBytes) <= slice.size - UInt64(headerSize),
+              Int(commandBytes) <= remainingBytes - remainingHeaderBytes,
+              let commands = file.read(at: slice.offset + UInt64(headerSize), count: Int(commandBytes)) else { return nil }
+        var commandOffset = 0
+        var sourceVersion: UInt64?
         for _ in 0..<Int(commandCount) {
-            guard commandOffset + 8 <= commandEnd,
-                  let command = readUInt32(data, at: commandOffset, littleEndian: littleEndian),
-                  let commandSize = readUInt32(data, at: commandOffset + 4, littleEndian: littleEndian),
-                  commandSize >= 8, Int(commandSize) <= commandEnd - commandOffset else { return nil }
-            if command == machoSourceVersionCommand,
-               let packed = readUInt64(data, at: commandOffset + 8, littleEndian: littleEndian) {
-                return decodeSourceVersion(packed)
+            guard commands.count - commandOffset >= 8,
+                  let command = readUInt32(commands, at: commandOffset, littleEndian: littleEndian),
+                  let commandSize = readUInt32(commands, at: commandOffset + 4, littleEndian: littleEndian),
+                  commandSize >= 8, commandSize % (magic == machoMagic64 ? 8 : 4) == 0,
+                  Int(commandSize) <= commands.count - commandOffset else { return nil }
+            if command == machoSourceVersionCommand {
+                guard commandSize == 16, sourceVersion == nil else { return nil }
+                sourceVersion = readUInt64(commands, at: commandOffset + 8, littleEndian: littleEndian)
             }
             commandOffset += Int(commandSize)
         }
-        return nil
+        guard commandOffset == commands.count, let sourceVersion else { return nil }
+        return decodeSourceVersion(sourceVersion)
     }
 
     private static func decodeSourceVersion(_ packed: UInt64) -> String? {
         let components = [
-            (packed >> 40) & 0x3ff,
+            packed >> 40,
             (packed >> 30) & 0x3ff,
             (packed >> 20) & 0x3ff,
             (packed >> 10) & 0x3ff,
@@ -238,9 +279,10 @@ struct ExecutableVersionProbe: Sendable {
 
     private static func scriptVersion(in data: Data) -> String? {
         guard let text = String(data: data, encoding: .utf8),
-              text.hasPrefix("#!"),
-              text.range(of: #"(?m)(?:^|\s)(?:our\s+)?\$VERSION\s*=\s*['\"]([0-9]+(?:\.[0-9]+){1,3})['\"]"#, options: .regularExpression) != nil,
-              let expression = try? NSRegularExpression(pattern: #"(?m)(?:^|\s)(?:our\s+)?\$VERSION\s*=\s*['\"]([0-9]+(?:\.[0-9]+){1,3})['\"]"#),
+              let shebang = text.split(whereSeparator: \.isNewline).first,
+              shebang.range(of: #"^#![ \t]*(?:/\S*/perl(?:[0-9.]+)?|/usr/bin/env[ \t]+(?:-S[ \t]+)?perl(?:[0-9.]+)?)(?:[ \t]|$)"#,
+                            options: .regularExpression) != nil,
+              let expression = try? NSRegularExpression(pattern: #"(?m)^[ \t]*(?:our[ \t]+)?\$VERSION\s*=\s*['\"]([0-9]+(?:\.[0-9]+){1,3})['\"]"#),
               let match = expression.firstMatch(in: text, range: NSRange(text.startIndex..<text.endIndex, in: text)),
               let range = Range(match.range(at: 1), in: text) else { return nil }
         return String(text[range])
@@ -259,14 +301,18 @@ struct ExecutableVersionProbe: Sendable {
 
     private static func bundleVersion(at url: URL, maximumBytes: Int) -> String? {
         let components = url.pathComponents
-        guard let appIndex = components.lastIndex(where: { $0.hasSuffix(".app") }) else { return nil }
-        let bundlePath = NSString.path(withComponents: Array(components[...appIndex]))
-        let infoURL = URL(fileURLWithPath: bundlePath).appendingPathComponent("Contents/Info.plist")
+        guard components.count >= 4, components.dropLast().suffix(2).elementsEqual(["Contents", "MacOS"]),
+              components[components.count - 4].hasSuffix(".app") else { return nil }
+        let infoURL = url.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Info.plist")
         guard let data = boundedFileData(at: infoURL, maximumBytes: min(maximumBytes, 64 * 1024)),
               let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] else { return nil }
-        let version = (plist["CFBundleShortVersionString"] as? String) ?? (plist["CFBundleVersion"] as? String)
-        let trimmed = version?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed?.isEmpty == false ? trimmed : nil
+        if let executable = plist["CFBundleExecutable"] as? String, executable != url.lastPathComponent { return nil }
+        for key in ["CFBundleShortVersionString", "CFBundleVersion"] {
+            if let version = (plist[key] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !version.isEmpty {
+                return version
+            }
+        }
+        return nil
     }
 
     /// Profiles are static application code: catalog data and discovered filenames never select a command or

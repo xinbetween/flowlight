@@ -2250,3 +2250,10 @@
 "Showing %lld of %lld destinations." = "Showing %lld of %lld destinations.";
 "Showing %lld of %lld tool calls." = "Showing %lld of %lld tool calls.";
 "Partial" = "Partial";
+"Mach-O source version (display only)" = "Mach-O source version (display only)";
+"Recursive home scan · depth %lld · up to %lld entries · system, generated, hidden, and cache folders skipped." = "Recursive home scan · depth %lld · up to %lld entries · system, generated, hidden, and cache folders skipped.";
+"The home folder was only partially inspected. The scan checks up to %lld entries at depth %lld and skips system, generated, hidden, and cache folders." = "The home folder was only partially inspected. The scan checks up to %lld entries at depth %lld and skips system, generated, hidden, and cache folders.";
+"Couldn't save the agent's destination policy: %@" = "Couldn't save the agent's destination policy: %@";
+"The agent's destination policy was saved, but Flowlight couldn't fully apply it: %@" = "The agent's destination policy was saved, but Flowlight couldn't fully apply it: %@";
+"Updating policy…" = "Updating policy…";
+"Partly allowed" = "Partly allowed";

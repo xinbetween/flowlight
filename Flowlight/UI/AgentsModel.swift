@@ -12,9 +12,23 @@ struct AgentDestination: Identifiable, Sendable, Equatable {
     var hasHostname = true
     /// The agent's tools or MCP servers that used this destination ("curl", "github MCP"); empty for the agent itself.
     var via: [String] = []
-    var id: String { label + "|" + ip }
+    struct Endpoint: Hashable, Sendable {
+        var ip: String
+        var isProvider: Bool
+    }
+    /// Hostname groups can contain several addresses or both provider and non-provider traffic.
+    var endpoints: Set<Endpoint> = []
+    var representedEndpoints: Set<Endpoint> {
+        endpoints.isEmpty ? [Endpoint(ip: ip, isProvider: provider != nil)] : endpoints
+    }
+    var id: String { policyKey }
     var policyKey: String { hasHostname ? label : "\u{0}" + ip }
+    var policyHost: String { hasHostname ? label : "" }
 
+    /// The domain or address added by the destination row's Allow action.
+    var allowPattern: String { hasHostname ? AnomalyEngine.registrableDomain(label) : ip }
+
+    var isProviderOnly: Bool { provider != nil && !endpoints.contains { !$0.isProvider } }
     var categories: Set<ProtocolCategory> { Set(protocols.map(ProtocolCatalog.category(of:))) }
     var isSensitive: Bool { categories.contains { $0.isSensitiveEgress } }
     var isUnnamed: Bool { !hasHostname }
@@ -38,7 +52,7 @@ struct AgentSummary: Identifiable, Sendable, Equatable {
     var id: String { bundleID }
 
     var total: FlowCounters { var c = ai; c += egress; c += local; return c }
-    var otherDestinations: [AgentDestination] { destinations.filter { $0.provider == nil } }
+    var otherDestinations: [AgentDestination] { destinations.filter { !$0.isProviderOnly } }
     var sensitiveProtocols: [String] {
         Array(Set(otherDestinations.filter(\.isSensitive).flatMap { $0.protocols.filter { ProtocolCatalog.category(of: $0).isSensitiveEgress } })).sorted()
     }
@@ -181,9 +195,13 @@ enum AgentsModel {
                 if let provider { ai += row.counters; providers[provider, default: FlowCounters()] += row.counters }
                 else if !IPOwnerLookup.isLocalNetwork(row.remoteIP) { egress += row.counters }
                 let label = !row.domain.isEmpty ? row.domain : (!row.owner.isEmpty ? row.owner : row.remoteIP)
-                let key = label + "|" + (row.domain.isEmpty ? row.remoteIP : "")
-                var entry = destinations[key] ?? AgentDestination(label: label, ip: row.remoteIP, provider: provider, protocols: [],
-                                                                  ports: "", counters: FlowCounters(), hasHostname: !row.domain.isEmpty)
+                let key = row.domain.isEmpty ? "\u{0}" + row.remoteIP : row.domain
+                var entry = destinations.removeValue(forKey: key) ?? AgentDestination(
+                    label: label, ip: row.remoteIP, provider: provider, protocols: [],
+                    ports: "", counters: FlowCounters(), hasHostname: !row.domain.isEmpty
+                )
+                entry.endpoints.insert(.init(ip: row.remoteIP, isProvider: provider != nil))
+                if entry.provider == nil { entry.provider = provider }
                 entry.counters += row.counters
                 let protos = row.protocols.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
                 protocolsByDestination[key, default: []].formUnion(protos)
@@ -262,6 +280,57 @@ struct AgentsViewSnapshot: Sendable {
     var monitorCandidates: [AlwaysMonitorBanner.Candidate] = []
     var linkedDemoCalls = 0
     var watermark: Date?
+}
+
+/// Preserve the last confirmed edit until a policy snapshot that started after its commit can replace it.
+struct AgentPolicyEdits {
+    private struct Entry {
+        var pending: (token: UUID, policy: AgentPolicy)?
+        var committed: (revision: Int, policy: AgentPolicy)?
+        var policy: AgentPolicy? { pending?.policy ?? committed?.policy }
+    }
+
+    private var entries: [String: Entry] = [:]
+
+    func hasOverlay(for agentID: String) -> Bool { entries[key(for: agentID)] != nil }
+    func isSaving(_ agentID: String) -> Bool { entries[key(for: agentID)]?.pending != nil }
+
+    func resolved(over policies: [String: AgentPolicy], identities: [String]) -> AgentPolicy? {
+        if entries.isEmpty { return AgentPolicy.resolve(policies.values, identities: identities) }
+        let unedited = policies.values.filter { !hasOverlay(for: $0.agentID) }
+        return AgentPolicy.resolve(unedited + entries.values.compactMap(\.policy), identities: identities)
+    }
+
+    mutating func begin(_ policy: AgentPolicy) -> UUID? {
+        let key = key(for: policy.agentID)
+        guard entries[key]?.pending == nil else { return nil }
+        let token = UUID()
+        entries[key, default: Entry()].pending = (token, policy)
+        return token
+    }
+
+    mutating func finish(_ result: AgentPolicySaveResult, agentID: String, token: UUID) {
+        let key = key(for: agentID)
+        guard var entry = entries[key], let pending = entry.pending, pending.token == token else { return }
+        entry.pending = nil
+        switch result {
+        case .writeFailed: break
+        case .committed(let revision), .committedReloadFailed(let revision):
+            entry.committed = (revision, pending.policy)
+        }
+        entries[key] = entry.policy == nil ? nil : entry
+    }
+
+    mutating func reconcile(snapshotRevision: Int) {
+        for key in Array(entries.keys) {
+            guard var entry = entries[key], let committed = entry.committed,
+                  committed.revision <= snapshotRevision else { continue }
+            entry.committed = nil
+            entries[key] = entry.policy == nil ? nil : entry
+        }
+    }
+
+    private func key(for agentID: String) -> String { AgentCatalog.identityComparisonKey(agentID) }
 }
 
 /// Run one request at a time. Same-scope refreshes replace a single pending request without cancelling useful work.

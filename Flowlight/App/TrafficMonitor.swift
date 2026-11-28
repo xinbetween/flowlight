@@ -83,6 +83,12 @@ final class TrafficAlertBadge {
     }
 }
 
+enum AgentPolicySaveResult: Equatable, Sendable {
+    case writeFailed
+    case committed(revision: Int)
+    case committedReloadFailed(revision: Int)
+}
+
 /// Owns the capture source, database, anomaly engine and live state.
 @MainActor
 final class TrafficMonitor: ObservableObject {
@@ -182,6 +188,8 @@ final class TrafficMonitor: ObservableObject {
     private let engine: AnomalyEngine
     private let trafficSourceFactory: (() -> TrafficSource)?
     private let policyLoader: @Sendable (TrafficDatabase) throws -> [String: AgentPolicy]
+    /// Incremented after a policy write commits, even if refreshing runtime enforcement fails.
+    private(set) var agentPolicyRevision = 0
     private let catalogTransportInjected: Bool
     private var source: TrafficSource?
     private var timers: [Timer] = []
@@ -1167,26 +1175,26 @@ final class TrafficMonitor: ObservableObject {
     /// switched to blocking travel: everything else stays a matter for alerts, and a source that can't block
     /// ignores them.
     private func pushEnforcement(completion: @escaping @MainActor (Bool) -> Void = { _ in }) {
-        let db = db
-        let loader = policyLoader
-        let liveAgentPolicies = liveAgentPolicies
-        Task { [weak self] in
-            do {
-                let enforcing = try await db.asyncResult { db in
-                    Array(try loader(db).values.filter { $0.enabled && $0.enforce })
+        db.async { [loader = policyLoader, weak self] db in
+            let result = Result { try loader(db).values.filter { $0.enabled && $0.enforce } }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                switch result {
+                case .success(let enforcing):
+                    self.applyAgentEnforcement(enforcing)
+                    completion(true)
+                case .failure(let error):
+                    // Keep the last good policy and complete the startup barrier as failed.
+                    self.inspection.lastError = L("Could not open database: %@", error.localizedDescription)
+                    completion(false)
                 }
-                guard let self else { return }
-                liveAgentPolicies.replace(enforcing)
-                self.source?.setEnforcement(enforcing)
-                completion(true)
-            } catch {
-                guard let self else { return }
-                // Do not publish an empty list: that would turn a persistence failure into a policy bypass. Complete
-                // the startup barrier as failed, keep inspection stopped, and make the reason visible instead.
-                self.inspection.lastError = L("Could not open database: %@", error.localizedDescription)
-                completion(false)
             }
         }
+    }
+
+    private func applyAgentEnforcement(_ enforcing: [AgentPolicy]) {
+        liveAgentPolicies.replace(enforcing)
+        source?.setEnforcement(enforcing)
     }
 
     /// Connections the filter refused. Each one becomes an alert naming the agent, where it was headed and the
@@ -1581,31 +1589,60 @@ final class TrafficMonitor: ObservableObject {
             askSendsOffDevice: ask.sendsOffDevice)
     }
 
-    /// Saves an agent's allowlist and applies it to new traffic right away — to the alerts, and to what the filter
-    /// refuses.
-    func savePolicy(_ policy: AgentPolicy) {
-        db.async { [engine, weak self] db in
+    /// Reports whether the edit was persisted independently of whether the live policy could be refreshed.
+    func savePolicy(_ policy: AgentPolicy, completion: @escaping @MainActor (AgentPolicySaveResult) -> Void) {
+        updateAgentPolicy({ db in
             try db.savePolicy(policy)
-            try engine.reloadPolicies()
-            Task { @MainActor in
-                self?.dataVersion += 1
-                self?.pushEnforcement()
-            }
-        }
+            return true
+        }, completion: completion)
     }
 
     /// "Allow from now on", from the alert about a connection that was refused.
     func allowFromNowOn(pattern: String, agentID: String) {
-        db.async { [engine, weak self] db in
+        updateAgentPolicy { db in
             let loaded = try db.loadPolicies()
             var policy = AgentPolicy.resolve(loaded.values, identities: [agentID]) ?? AgentPolicy(agentID: agentID)
-            guard !policy.patterns.contains(pattern) else { return }
+            guard !policy.patterns.contains(pattern) else { return false }
             policy.patterns.append(pattern)
             try db.savePolicy(policy)
-            try engine.reloadPolicies()
-            Task { @MainActor in
-                self?.dataVersion += 1
-                self?.pushEnforcement()
+            return true
+        }
+    }
+
+    private func updateAgentPolicy(
+        _ write: @escaping @Sendable (TrafficDatabase) throws -> Bool,
+        completion: @escaping @MainActor (AgentPolicySaveResult) -> Void = { _ in }
+    ) {
+        db.async { [engine, loader = policyLoader, weak self] db in
+            do {
+                guard try write(db) else { return }
+            } catch {
+                DispatchQueue.main.async { [weak self] in
+                    let detail = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+                    self?.lastError = L("Couldn't save the agent's destination policy: %@", detail)
+                    completion(.writeFailed)
+                }
+                return
+            }
+            let reloaded = Result {
+                try engine.reloadPolicies()
+                return try loader(db).values.filter { $0.enabled && $0.enforce }
+            }
+            // Dispatch straight from the serial writer so revisions and live publications follow SQLite commit order.
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.agentPolicyRevision += 1
+                let revision = self.agentPolicyRevision
+                self.dataVersion += 1
+                switch reloaded {
+                case .success(let enforcing):
+                    self.applyAgentEnforcement(enforcing)
+                    completion(.committed(revision: revision))
+                case .failure(let error):
+                    self.lastError = L("The agent's destination policy was saved, but Flowlight couldn't fully apply it: %@",
+                                       error.localizedDescription)
+                    completion(.committedReloadFailed(revision: revision))
+                }
             }
         }
     }

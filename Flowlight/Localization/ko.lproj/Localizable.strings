@@ -2250,3 +2250,10 @@
 "Showing %lld of %lld destinations." = "대상 %lld개를 표시합니다(전체 %lld개).";
 "Showing %lld of %lld tool calls." = "도구 호출 %lld개를 표시합니다(전체 %lld개).";
 "Partial" = "부분적";
+"Mach-O source version (display only)" = "Mach-O 소스 버전(표시 전용)";
+"Recursive home scan · depth %lld · up to %lld entries · system, generated, hidden, and cache folders skipped." = "홈 폴더 재귀 스캔 · 깊이 %lld · 최대 %lld개 항목 · 시스템, 빌드, 숨김 및 캐시 폴더 제외.";
+"The home folder was only partially inspected. The scan checks up to %lld entries at depth %lld and skips system, generated, hidden, and cache folders." = "홈 폴더의 일부를 검사했습니다. 최대 %lld개 항목을 깊이 %lld까지 검사하며 시스템, 빌드, 숨김 및 캐시 폴더는 건너뜁니다.";
+"Couldn't save the agent's destination policy: %@" = "에이전트의 대상 정책을 저장하지 못했습니다: %@";
+"The agent's destination policy was saved, but Flowlight couldn't fully apply it: %@" = "에이전트의 대상 정책을 저장했지만 Flowlight가 정책을 완전히 적용하지 못했습니다: %@";
+"Updating policy…" = "정책 업데이트 중…";
+"Partly allowed" = "일부 허용";

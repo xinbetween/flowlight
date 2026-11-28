@@ -262,6 +262,7 @@ struct AgentAdvisoryScanner {
         var descriptor: Int32 = -1
         var entriesListed = 0
         var attemptedReads = 0
+        var observedFindingCount = 0
         var reasons = Set<String>()
         var outcome: Outcome = .complete
 
@@ -316,7 +317,9 @@ struct AgentAdvisoryScanner {
             }
         }
 
-        func result() -> AgentAdvisorySourceResult {
+        func result(retainedFindings: Int) -> AgentAdvisorySourceResult {
+            report.findings = retainedFindings
+            report.omittedFindings = observedFindingCount - retainedFindings
             report.reasons = reasons.sorted()
             if report.status != .permissionDenied {
                 switch outcome {
@@ -341,10 +344,28 @@ struct AgentAdvisoryScanner {
     }
 
     private struct ScanState {
-        var findings: [AgentAdvisoryFinding] = []
+        private var findingsBySeverity: [AgentAdvisoryFinding.Severity: [AgentAdvisoryFinding]] = [:]
+        private var retainedFindingCount = 0
         var evidence: [EvidenceKey: Int] = [:]
         var ecosystems = Set<String>()
         var totalBytes = 0
+
+        var findings: [AgentAdvisoryFinding] {
+            AgentAdvisoryFinding.Severity.allCases.reversed().flatMap { findingsBySeverity[$0, default: []] }
+        }
+
+        mutating func retain(severity: AgentAdvisoryFinding.Severity, limit: Int, makeFinding: () -> AgentAdvisoryFinding) {
+            guard limit > 0 else { return }
+            if retainedFindingCount == limit {
+                guard let lowest = findingsBySeverity.keys.min(), lowest < severity else { return }
+                // Evict the newest detail in the lowest tier so earlier ties survive.
+                findingsBySeverity[lowest, default: []].removeLast()
+                if findingsBySeverity[lowest]?.isEmpty == true { findingsBySeverity.removeValue(forKey: lowest) }
+            } else {
+                retainedFindingCount += 1
+            }
+            findingsBySeverity[severity, default: []].append(makeFinding())
+        }
 
         var observedEvidence: [AgentAdvisoryObservedEvidence] {
             evidence.keys.sorted {
@@ -399,7 +420,10 @@ struct AgentAdvisoryScanner {
             _ = walkDirectory(source.descriptor, relative: [], agent: nil, source: source, state: &state)
         }
         let evidence = state.observedEvidence
-        return AgentAdvisoryScanResult(findings: state.findings, sources: sources.map { $0.result() },
+        let findings = state.findings
+        let retainedBySource = findings.reduce(into: [String: Int]()) { $0[$1.sourceID, default: 0] += 1 }
+        return AgentAdvisoryScanResult(findings: findings,
+                                       sources: sources.map { $0.result(retainedFindings: retainedBySource[$0.report.sourceID, default: 0]) },
                                        privateDataAccess: evidence.contains(where: \.hasPrivateDataAccess),
                                        untrustedContent: evidence.contains(where: \.hasUntrustedContent),
                                        externalEgress: evidence.contains(where: \.hasExternalEgress),
@@ -696,7 +720,7 @@ struct AgentAdvisoryScanner {
             categories.insert(.gateway)
             egress = true
         }
-        if Self.credentialPattern.firstMatch(in: lower, range: NSRange(lower.startIndex..., in: lower)) != nil {
+        if Self.hasLiteralCredential(in: data, fileExtension: (lowerName as NSString).pathExtension) {
             categories.insert(.credentials)
             privateData = true
         }
@@ -706,26 +730,109 @@ struct AgentAdvisoryScanner {
             let severity = severity(for: category, text: lower)
             let key = EvidenceKey(category: category, severity: severity, privateData: privateData, untrusted: untrusted, egress: egress)
             state.evidence[key, default: 0] += 1
-            guard state.findings.count < max(0, configuration.maximumFindings) else {
-                source.report.omittedFindings += 1
-                continue
+            source.observedFindingCount += 1
+            state.retain(severity: severity, limit: configuration.maximumFindings) {
+                let (surface, title, explanation, remediation) = presentation(for: category)
+                let agent = agent ?? L("Unknown agent")
+                let sourceID = source.report.sourceID
+                return AgentAdvisoryFinding(id: "\(sourceID):\(category.rawValue):\(agent):\(path)",
+                                            sourceID: sourceID, agent: agent, category: category,
+                                            severity: severity, surface: surface, source: path,
+                                            title: title, explanation: explanation, remediation: remediation,
+                                            hasPrivateDataAccess: privateData, hasUntrustedContent: untrusted,
+                                            hasExternalEgress: egress)
             }
-            let (surface, title, explanation, remediation) = presentation(for: category)
-            let agent = agent ?? L("Unknown agent")
-            let sourceID = source.report.sourceID
-            state.findings.append(AgentAdvisoryFinding(id: "\(sourceID):\(category.rawValue):\(agent):\(path)",
-                                                      sourceID: sourceID, agent: agent, category: category,
-                                                      severity: severity, surface: surface, source: path,
-                                                      title: title, explanation: explanation, remediation: remediation,
-                                                      hasPrivateDataAccess: privateData, hasUntrustedContent: untrusted,
-                                                      hasExternalEgress: egress))
-            source.report.findings += 1
         }
     }
 
-    private static let credentialPattern = try! NSRegularExpression(
-        pattern: #"\b(api[_-]?key|access[_-]?key|secret|token|password|private[_-]?key|authorization)\b["']?\s*[=:]"#
+    private static let credentialKey = #"(?:[a-z0-9]+[_-])*(?:api[_-]?key|access[_-]?key|secret|token|password|private[_-]?key|authorization)"#
+    private static let credentialKeyPattern = try! NSRegularExpression(pattern: "^\(credentialKey)$", options: .caseInsensitive)
+
+    // Match quoted TOML assignments and skip comments and other strings, including multiline strings.
+    private static let basicString = #""(?:[^"\\\r\n]++|\\[^\r\n])*+""#
+    private static let literalString = #"'[^'\r\n]*'"#
+    private static let tomlCredentialPattern = try! NSRegularExpression(
+        pattern: #"""
+        (?:^|[.{,])[\t\x20]*(?:\#(credentialKey)|"\#(credentialKey)"|'\#(credentialKey)')[\t\x20]*=[\t\x20]*
+        (\#(basicString)|\#(literalString))(?=[\t\x20]*(?:[,}\r\n]|\x23|\z))
+        | """(?:[^"\\]++|\\[\s\S]|"(?!""))*+(?:"""|\z)
+        | '''[\s\S]*?(?:'''|\z)
+        | \#(basicString) | \#(literalString) | \x23[^\r\n]*
+        """#, options: [.caseInsensitive, .anchorsMatchLines, .allowCommentsAndWhitespace]
     )
+    private static let yamlCredentialPattern = try! NSRegularExpression(
+        pattern: #"""
+        ^[\t\x20]*(?:\#(credentialKey)|"\#(credentialKey)"|'\#(credentialKey)')[\t\x20]*:[\t\x20]+
+        (\#(basicString)|\#(literalString)|[^\s\x23"'\[\]{},>|*&!][^\r\n\x23]*)(?=[\t\x20]*(?:\x23|$))
+        """#, options: [.caseInsensitive, .anchorsMatchLines, .allowCommentsAndWhitespace]
+    )
+
+    private static func hasLiteralCredential(in data: Data, fileExtension: String) -> Bool {
+        switch fileExtension {
+        case "json":
+            return (try? JSONSerialization.jsonObject(with: data, options: .json5Allowed)).map(containsLiteralCredential) ?? false
+        case "plist":
+            return (try? PropertyListSerialization.propertyList(from: data, format: nil)).map(containsLiteralCredential) ?? false
+        case "toml", "yaml", "yml":
+            let text = String(decoding: data, as: UTF8.self)
+            let pattern = fileExtension == "toml" ? tomlCredentialPattern : yamlCredentialPattern
+            var found = false
+            pattern.enumerateMatches(in: text, range: NSRange(text.startIndex..., in: text)) { match, _, stop in
+                guard let match, let range = Range(match.range(at: 1), in: text) else { return }
+                let raw = String(text[range])
+                let value: String?
+                if raw.hasPrefix("\"") {
+                    value = (try? JSONSerialization.jsonObject(with: Data(raw.utf8), options: .fragmentsAllowed)) as? String
+                } else if raw.hasPrefix("'") {
+                    value = String(raw.dropFirst().dropLast())
+                } else {
+                    value = raw
+                }
+                if let value, isPlausibleCredentialLiteral(value) {
+                    found = true
+                    stop.pointee = true
+                }
+            }
+            return found
+        default:
+            return false
+        }
+    }
+
+    private static func containsLiteralCredential(_ node: Any) -> Bool {
+        if let object = node as? [String: Any] {
+            return object.contains { key, value in
+                if let literal = value as? String {
+                    return credentialKeyPattern.firstMatch(in: key, range: NSRange(key.startIndex..., in: key)) != nil
+                        && isPlausibleCredentialLiteral(literal)
+                }
+                return containsLiteralCredential(value)
+            }
+        }
+        return (node as? [Any])?.contains(where: containsLiteralCredential) ?? false
+    }
+
+    private static let placeholderValues: Set<String> = [
+        "null", "none", "nil", "false", "true", "undefined", "unset", "n/a", "todo", "test", "example", "dummy",
+        "placeholder", "changeme", "replaceme", "yourkeyhere", "yourapikeyhere", "yourtokenhere", "redacted"
+    ]
+    private static let referencePattern = try! NSRegularExpression(pattern: #"""
+        \$\{|\{\{|\{env:|%[a-z_][a-z0-9_]*%|\$\([^)]+\)|
+        ^(?:\$|<|\[|env[:.(\[]|getenv\(|process\.env\b|os\.(?:getenv|environ)\b|op://|vault://|secret://)|
+        ^(?:sk[-_])?(?:(?:your|example|dummy|placeholder|change|replace|insert|put)[-_\s.]|x{3,}$|\.{3,}$)
+        """#, options: .allowCommentsAndWhitespace)
+
+    private static func isPlausibleCredentialLiteral(_ raw: String) -> Bool {
+        var literal = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let parts = literal.split(maxSplits: 1, whereSeparator: \.isWhitespace)
+        if parts.first == "bearer" || parts.first == "basic" {
+            guard parts.count == 2 else { return false }
+            literal = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard literal.utf8.count >= 4, literal.rangeOfCharacter(from: .alphanumerics) != nil,
+              !placeholderValues.contains(literal) else { return false }
+        return referencePattern.firstMatch(in: literal, range: NSRange(literal.startIndex..., in: literal)) == nil
+    }
 
     private func presentation(for category: AgentAdvisoryFinding.Category) -> (AgentAdvisoryFinding.Surface, String, String, String) {
         switch category {

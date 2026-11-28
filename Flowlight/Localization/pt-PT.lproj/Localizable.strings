@@ -2250,3 +2250,10 @@
 "Showing %lld of %lld destinations." = "São mostrados %lld de %lld destinos.";
 "Showing %lld of %lld tool calls." = "São mostradas %lld de %lld chamadas a ferramentas.";
 "Partial" = "Parcial";
+"Mach-O source version (display only)" = "Versão de origem Mach-O (apenas para visualização)";
+"Recursive home scan · depth %lld · up to %lld entries · system, generated, hidden, and cache folders skipped." = "Análise recursiva da pasta pessoal · profundidade %lld · até %lld entradas · pastas de sistema, de compilação, ocultas e de cache ignoradas.";
+"The home folder was only partially inspected. The scan checks up to %lld entries at depth %lld and skips system, generated, hidden, and cache folders." = "A pasta pessoal foi inspecionada parcialmente. A análise verifica até %lld entradas à profundidade de %lld e ignora pastas de sistema, de compilação, ocultas e de cache.";
+"Couldn't save the agent's destination policy: %@" = "Não foi possível guardar a política de destinos do agente: %@";
+"The agent's destination policy was saved, but Flowlight couldn't fully apply it: %@" = "A política de destinos do agente foi guardada, mas o Flowlight não conseguiu aplicá-la na totalidade: %@";
+"Updating policy…" = "A atualizar a política…";
+"Partly allowed" = "Parcialmente permitido";
