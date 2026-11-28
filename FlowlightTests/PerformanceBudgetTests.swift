@@ -84,6 +84,115 @@ final class PerformanceBudgetTests: XCTestCase {
         XCTAssertTrue(projection.breakdown.isTruncated)
     }
 
+    func testAgentTrafficProjectionBudgetOnHighVolumeProxyFixture() throws {
+        let url = temporaryDatabaseURL("agents-high-volume")
+        defer { removeTemporaryDatabase(url) }
+        let db = try TrafficDatabase(url: url)
+        let start = fixedTimestamp / 3_600 * 3_600
+        let secondsPerHour = 3_600
+        let relationshipCount = 5_003
+        let rowsPerHour = 20_000
+        let keys = (0..<relationshipCount).map { index -> FlowKey in
+            var key = FlowKey(pid: 10, bundleID: "curl", appName: "curl", appPath: "",
+                              remoteIP: "198.51.100.\(index % 250 + 1)", domain: "host-\(index).example",
+                              port: 443, transport: .tcp, appProtocol: "https")
+            key.parentAgent = "claude"
+            key.parentAgentName = "Claude Code"
+            return key
+        }
+        let quiet = FlowKey(pid: 11, bundleID: "quiet.agent", appName: "Quiet agent", appPath: "",
+                            remoteIP: "203.0.113.10", domain: "api.openai.com", port: 443,
+                            transport: .tcp, appProtocol: "https")
+        let outbound = FlowCounters(bytesOut: 10, flows: 1)
+        for hour in 0..<6 {
+            let hourStart = start + Int64(hour * secondsPerHour)
+            let rows = (0..<rowsPerHour).map { index in
+                (hourStart + Int64(index * secondsPerHour / rowsPerHour), keys[index % relationshipCount], outbound)
+            }
+            try db.insertAggregates("flows_1s", rows + [(hourStart + 5, quiet, .init(bytesIn: 1, bytesOut: 1, flows: 1))])
+        }
+        let to = Date(timeIntervalSince1970: Double(start + 6 * 3_600))
+        try db.rollup(now: to.addingTimeInterval(120), retention: .init(seconds: 8 * 3_600))
+        let reader = try TrafficDatabase(url: url, readOnly: true)
+        let policy = AgentPolicy(agentID: "claude", patterns: ["198.51.100.0/25"])
+        try db.savePolicy(policy)
+        for window in AgentWindow.allCases {
+            let from = to.addingTimeInterval(-window.interval)
+            let sqlPlan = try reader.agentTrafficQueryPlan(window.granularity, from: from, to: to)
+            XCTAssertTrue(sqlPlan.contains { $0.contains("SEARCH \(window.granularity.table)") && $0.contains("ts>") },
+                          sqlPlan.joined(separator: "\n"))
+            XCTAssertTrue(sqlPlan.contains { $0.contains("SEARCH o USING INDEX") && $0.contains("ip=?") },
+                          sqlPlan.joined(separator: "\n"))
+            let cancellation = TrafficReadCancellation()
+            let snapshot = try assertBudget(
+                "Agent \(window.rawValue) projection and derivation", fixture: "120,006 rows; 5,004 relationships",
+                budgetMilliseconds: 1_250
+            ) {
+                let evidence = try AgentsModel.read(reader, granularity: window.granularity, from: from, to: to,
+                                                     focus: .none, cancellation: cancellation)
+                return try AgentsModel.derive(evidence, input: .init(installedApps: [], scanInstalledApps: false,
+                                                                   workspaces: [], monitoredAgentNames: [],
+                                                                   inspection: .unavailable, guardrailAgentIDs: []),
+                                              stress: false, cancellation: cancellation)
+            }
+            let hours: Int64 = window == .hour ? 1 : 6
+            let busy = try XCTUnwrap(snapshot.inventory.first { $0.id == "claude" })
+            let sentinel = try XCTUnwrap(snapshot.inventory.first { $0.id == "quiet.agent" })
+            XCTAssertEqual(busy.summary?.total.bytesOut, Int64(rowsPerHour) * 10 * hours)
+            XCTAssertEqual(busy.summary?.total.flows, Int64(rowsPerHour) * hours)
+            XCTAssertEqual(sentinel.summary?.ai.bytesOut, hours)
+            XCTAssertEqual(busy.summary?.omittedRelationships, relationshipCount - 128)
+            XCTAssertEqual(sentinel.summary?.omittedRelationships, 0)
+            XCTAssertEqual(busy.policy.uncoveredDestinations, keys.filter { Int($0.remoteIP.split(separator: ".").last ?? "")! >= 128 }.count)
+            XCTAssertFalse(busy.policy.isPartial)
+            XCTAssertEqual(snapshot.coverage.relationshipsShown, 129)
+        }
+    }
+
+    func testAgentReloadKeepsOnlyLatestPendingRequestAndCancelsObsoleteScopes() async {
+        let coordinator = AgentsReloadCoordinator<String>()
+        let firstStarted = expectation(description: "first load started")
+        let lastStarted = expectation(description: "the latest same-scope refresh started")
+        let replacementStarted = expectation(description: "replacement scope started")
+        var releaseFirst: CheckedContinuation<Void, Never>?
+        var releaseLast: CheckedContinuation<Void, Never>?
+        var firstCancellation: TrafficReadCancellation?
+        var lastCancellation: TrafficReadCancellation?
+        var published: [Int] = []
+        coordinator.submit(scope: "hour") { cancellation in
+            firstCancellation = cancellation
+            await withCheckedContinuation { continuation in
+                releaseFirst = continuation
+                firstStarted.fulfill()
+            }
+            if !cancellation.isCancelled { published.append(0) }
+        }
+        await fulfillment(of: [firstStarted], timeout: 2)
+        for revision in 1...20 {
+            coordinator.submit(scope: "hour") { cancellation in
+                guard revision == 20 else { return XCTFail("obsolete refresh ran") }
+                lastCancellation = cancellation
+                await withCheckedContinuation { continuation in
+                    releaseLast = continuation
+                    lastStarted.fulfill()
+                }
+                if !cancellation.isCancelled { published.append(revision) }
+            }
+        }
+        XCTAssertEqual(firstCancellation?.isCancelled, false)
+        releaseFirst?.resume()
+        await fulfillment(of: [lastStarted], timeout: 2)
+        XCTAssertEqual(published, [0])
+        coordinator.submit(scope: "week") { cancellation in
+            if !cancellation.isCancelled { published.append(21) }
+            replacementStarted.fulfill()
+        }
+        XCTAssertEqual(lastCancellation?.isCancelled, true)
+        releaseLast?.resume()
+        await fulfillment(of: [replacementStarted], timeout: 2)
+        XCTAssertEqual(published, [0, 21])
+    }
+
     func testAlertsQueryBudget() throws {
         let alertCount = 10_000
         let appCount = 100

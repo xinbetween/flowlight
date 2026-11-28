@@ -127,6 +127,44 @@ struct ReportsBreakdown: Sendable {
     var isTruncated: Bool
 }
 
+/// Complete traffic evidence and bounded relationship detail for each proven root.
+struct AgentTrafficProjection: Sendable {
+    struct Root: Sendable {
+        var appName: String
+        var appPath: String
+        var parentName: String
+        var hasExactChildren: Bool
+        var ai = FlowCounters()
+        var egress = FlowCounters()
+        var local = FlowCounters()
+        var providers: [String: FlowCounters] = [:]
+        var relationshipCount = 0
+    }
+
+    struct Endpoint: Sendable {
+        var host: String
+        var ip: String
+        var isProvider: Bool
+        var destinationKey: String { host.isEmpty ? "\u{0}" + ip : host }
+    }
+
+    var roots: [String: Root] = [:]
+    var rows: [BreakdownRow] = []
+    var policyEndpoints: [String: [Endpoint]] = [:]
+    var configuredMCP: [String: [String]] = [:]
+    var hasFullPolicyEvidence = true
+
+    var returnedRelationshipCount: Int { rows.count }
+    var totalRelationshipCount: Int { roots.values.reduce(0) { $0 + $1.relationshipCount } }
+    var distinctRootCount: Int { roots.count }
+    var isTruncated: Bool { totalRelationshipCount > returnedRelationshipCount }
+}
+
+struct AgentExchangePage: Sendable {
+    var exchanges: [HTTPExchange]
+    var hasMore: Bool
+}
+
 struct BreakdownRow: Sendable {
     var bundleID: String
     var appName: String
@@ -1174,8 +1212,12 @@ final class TrafficDatabase: @unchecked Sendable {
     // MARK: Queries
 
     /// Execute a related projection against one committed WAL snapshot while capture continues writing.
-    func readSnapshot<T>(_ body: () throws -> T) throws -> T {
-        try conn.readTransaction(body)
+    func readSnapshot<T>(cancellation: TrafficReadCancellation? = nil, _ body: () throws -> T) throws -> T {
+        try cancellation?.check()
+        return try conn.readTransaction {
+            if let cancellation { return try conn.withCancellation(cancellation, body) }
+            return try body()
+        }
     }
 
     private func whereClause(from: Date, to: Date, filter: TrafficFilter,
@@ -1489,6 +1531,154 @@ final class TrafficDatabase: @unchecked Sendable {
                          routeProxyBundleID: row.text(19), routeProxyName: row.text(20), routeProxyPath: row.text(21),
                          channel: NetworkChannel(rawValue: row.text(22)) ?? .ip)
         }
+    }
+
+    private var agentProjectionFunctionsRegistered = false
+
+    private func registerAgentProjectionFunctions() throws {
+        if !agentProjectionFunctionsRegistered {
+            try conn.registerTextFunction("fl_agent_known") { bundleID, appName in
+                AgentCatalog.knownAgent(bundleID: bundleID, appName: appName)?.name
+            }
+            try conn.registerTextFunction("fl_agent_provider", AgentCatalog.provider)
+            try conn.registerTextFunction("fl_agent_browser") { bundleID, _ in
+                AgentCatalog.isBrowser(bundleID) ? "1" : nil
+            }
+            try conn.registerTextFunction("fl_agent_local") { ip, _ in
+                IPOwnerLookup.isLocalNetwork(ip) ? "1" : nil
+            }
+            try conn.registerTextFunction("fl_agent_identity") { identity, _ in
+                AgentCatalog.identityComparisonKey(identity)
+            }
+            agentProjectionFunctionsRegistered = true
+        }
+    }
+
+    private func agentProjectionQuery(_ granularity: Granularity, from: Date, to: Date, filter: TrafficFilter,
+                                      includePolicyEvidence: Bool) throws -> (String, [SQLValue]) {
+        try registerAgentProjectionFunctions()
+        let (clause, values) = whereClause(from: from, to: to, filter: filter, includeAttributedChildren: true)
+        let endpoints = includePolicyEvidence ? """
+            UNION ALL SELECT 'endpoint', c.root, c.host, c.remote_ip, c.provider, '', '', '', '', '', 0, 0, 0, 0
+                FROM classified c JOIN roots r ON r.root = c.root GROUP BY c.root, c.host, c.remote_ip, c.provider
+            """ : ""
+        // The first GROUP BY uses the legacy relationship key. Hostname votes use an individual relationship's
+        // bytes, not the sum for a hostname. Backfill includes all scoped traffic, even traffic of excluded apps.
+        return ("""
+            WITH grouped AS MATERIALIZED (
+                SELECT bundle_id, MAX(app_name) AS app, MAX(app_path) AS path, domain, remote_ip, port, protocol,
+                       SUM(bytes_in) AS bin, SUM(bytes_out) AS bout, SUM(flows) AS n,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent ELSE '' END AS parent,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN agent_parent_name ELSE '' END AS parent_name,
+                       CASE WHEN attribution_exact = 1 AND attribution_epoch = 1 THEN mcp_server ELSE '' END AS mcp,
+                       ROW_NUMBER() OVER (ORDER BY bundle_id, domain, remote_ip, port, attribution_exact, attribution_epoch,
+                           agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name, launcher_path,
+                           upstream_launcher_bundle_id, upstream_launcher_name, upstream_launcher_path,
+                           route_proxy_bundle_id, route_proxy_name, route_proxy_path, channel, protocol) AS relationship
+                FROM \(granularity.table) WHERE \(clause)
+                GROUP BY bundle_id, domain, remote_ip, port, attribution_exact, attribution_epoch,
+                         agent_parent, agent_parent_name, mcp_server, launcher_bundle_id, launcher_name, launcher_path,
+                         upstream_launcher_bundle_id, upstream_launcher_name, upstream_launcher_path,
+                         route_proxy_bundle_id, route_proxy_name, route_proxy_path, channel, protocol
+            ), missing AS MATERIALIZED (
+                SELECT DISTINCT remote_ip FROM grouped WHERE domain = ''
+            ), hostname_choices AS (
+                SELECT g.remote_ip, g.domain, ROW_NUMBER() OVER (
+                    PARTITION BY g.remote_ip ORDER BY g.bin + g.bout DESC, g.relationship
+                ) AS choice
+                FROM grouped g JOIN missing m ON m.remote_ip = g.remote_ip WHERE g.domain <> ''
+            ), hostnames AS MATERIALIZED (
+                SELECT remote_ip, domain FROM hostname_choices WHERE choice = 1
+            ), attributed AS MATERIALIZED (
+                SELECT g.*, COALESCE(NULLIF(g.parent, ''), g.bundle_id) AS root,
+                       COALESCE(NULLIF(g.domain, ''), h.domain, '') AS host, COALESCE(o.owner, '') AS owner
+                FROM grouped g LEFT JOIN hostnames h ON g.domain = '' AND h.remote_ip = g.remote_ip
+                LEFT JOIN ip_owners o ON o.ip = g.remote_ip
+            ), classified AS MATERIALIZED (
+                SELECT a.*, COALESCE(fl_agent_provider(host, owner), '') AS provider FROM attributed a
+            ), root_metadata AS MATERIALIZED (
+                SELECT root,
+                       MIN(CASE WHEN bundle_id = root AND app <> '' THEN relationship END) AS app_row,
+                       MIN(CASE WHEN bundle_id = root AND path <> '' THEN relationship END) AS path_row,
+                       MIN(CASE WHEN parent_name <> '' THEN relationship END) AS parent_row,
+                       MAX(parent <> '') AS exact_child,
+                       MAX(provider <> '' AND (bin <> 0 OR bout <> 0 OR n <> 0)) AS uses_ai
+                FROM classified GROUP BY root
+            ), roots AS MATERIALIZED (
+                SELECT m.root, COALESCE(a.app, p.parent_name, '') AS app, COALESCE(b.path, '') AS path,
+                       COALESCE(p.parent_name, '') AS parent_name, m.exact_child
+                FROM root_metadata m
+                LEFT JOIN grouped a ON a.relationship = m.app_row
+                LEFT JOIN grouped b ON b.relationship = m.path_row
+                LEFT JOIN grouped p ON p.relationship = m.parent_row
+                WHERE fl_agent_browser(m.root, '') IS NULL AND (
+                    fl_agent_known(m.root, COALESCE(a.app, p.parent_name, '')) IS NOT NULL OR m.exact_child OR m.uses_ai
+                )
+            ), totals AS (
+                SELECT c.root, c.provider,
+                       CASE WHEN c.provider = '' THEN fl_agent_local(c.remote_ip, '') IS NOT NULL ELSE 0 END AS local,
+                       SUM(c.bin) AS bin, SUM(c.bout) AS bout, SUM(c.n) AS n, COUNT(*) AS relationships
+                FROM classified c JOIN roots r ON r.root = c.root GROUP BY c.root, c.provider, local
+            ), ranked AS (
+                SELECT c.*, ROW_NUMBER() OVER (PARTITION BY c.root ORDER BY c.bin + c.bout DESC, c.relationship) AS rank
+                FROM classified c JOIN roots r ON r.root = c.root
+            )
+            SELECT 'total', t.root, t.provider, r.app, r.path, r.parent_name, r.exact_child, '', '', '', t.bin, t.bout, t.n,
+                   CASE WHEN t.local THEN -t.relationships ELSE t.relationships END FROM totals t JOIN roots r ON r.root = t.root
+            UNION ALL SELECT 'detail', root, bundle_id, app, host, remote_ip, protocol, owner, parent, mcp, bin, bout, n, port
+                FROM ranked WHERE rank <= ?
+            UNION ALL SELECT 'mcp', c.root, c.mcp, '', '', '', '', '', '', '', 0, 0, 0, 0
+                FROM classified c JOIN roots r ON r.root = c.root WHERE c.mcp <> '' AND c.parent <> '' GROUP BY c.root, c.mcp
+            \(endpoints)
+            """, values)
+    }
+
+    /// The limit applies separately to each proven root and affects only relationship detail.
+    func agentTrafficProjection(_ granularity: Granularity, from: Date, to: Date,
+                                filter: TrafficFilter = .none, limit: Int = 128,
+                                includePolicyEvidence: Bool = true) throws -> AgentTrafficProjection {
+        let (sql, values) = try agentProjectionQuery(granularity, from: from, to: to, filter: filter,
+                                                     includePolicyEvidence: includePolicyEvidence)
+        var projection = AgentTrafficProjection(hasFullPolicyEvidence: includePolicyEvidence)
+        try conn.forEachRow(sql, values + [.int(Int64(max(1, min(limit, 4_096))))]) { row in
+            let root = row.text(1)
+            switch row.text(0) {
+            case "total":
+                var entry = projection.roots[root] ?? .init(appName: row.text(3), appPath: row.text(4),
+                                                           parentName: row.text(5), hasExactChildren: row.int(6) != 0)
+                let provider = row.text(2)
+                let relationships = Int(row.int(13))
+                let counters = FlowCounters(bytesIn: row.int(10), bytesOut: row.int(11), flows: row.int(12))
+                entry.relationshipCount += abs(relationships)
+                if !provider.isEmpty {
+                    entry.ai += counters
+                    entry.providers[provider] = counters
+                } else if relationships < 0 {
+                    entry.local += counters
+                } else {
+                    entry.egress += counters
+                }
+                projection.roots[root] = entry
+            case "detail":
+                projection.rows.append(BreakdownRow(bundleID: row.text(2), appName: row.text(3),
+                    appPath: "", domain: row.text(4), remoteIP: row.text(5), ports: row.text(13),
+                    protocols: row.text(6), counters: .init(bytesIn: row.int(10), bytesOut: row.int(11), flows: row.int(12)),
+                    owner: row.text(7), parentAgent: row.text(8), mcpServer: row.text(9)))
+            case "endpoint":
+                projection.policyEndpoints[root, default: []].append(
+                    .init(host: row.text(2), ip: row.text(3), isProvider: !row.text(4).isEmpty))
+            case "mcp":
+                projection.configuredMCP[root, default: []].append(row.text(2))
+            default: break
+            }
+        }
+        return projection
+    }
+
+    func agentTrafficQueryPlan(_ granularity: Granularity, from: Date, to: Date) throws -> [String] {
+        let (sql, values) = try agentProjectionQuery(granularity, from: from, to: to, filter: .none,
+                                                     includePolicyEvidence: true)
+        return try conn.query("EXPLAIN QUERY PLAN " + sql, values + [.int(128)]) { $0.text(3) }
     }
 
     /// Per-dimension totals aggregated in SQL (no row cap needed: one row per distinct key).
@@ -3223,7 +3413,9 @@ final class TrafficDatabase: @unchecked Sendable {
                    focus: FocusScope = .none, app: String? = nil, apps: [String] = [], host: String? = nil,
                    hostIncludesSubdomains: Bool = true, includeAttributedChildren: Bool = false,
                    agentParent: String? = nil, mcpServer: String? = nil,
-                   potentialHarmOnly: Bool = false, policyEffectsOnly: Bool = false) throws -> [HTTPExchange] {
+                   potentialHarmOnly: Bool = false, policyEffectsOnly: Bool = false,
+                   inspectionOnly: Bool = false, until: Date? = nil,
+                   agentChildWindows: String? = nil) throws -> [HTTPExchange] {
         let like = "%\(search)%"
         var scopeClause = ""
         var scopeValues: [SQLValue] = []
@@ -3286,6 +3478,24 @@ final class TrafficDatabase: @unchecked Sendable {
         let policyClause = policyEffectsOnly
             ? " AND (mock_rule <> '' OR guardrail <> '' OR request_rewrite <> '' OR response_transform <> '')"
             : ""
+        let hasMetadata = "(tool_calls <> '' OR tool_results <> '' OR mcp <> '' OR llm <> '')"
+        let inspectionClause: String
+        if agentChildWindows != nil {
+            inspectionClause = """
+                AND NOT \(hasMetadata)
+                AND id IN (
+                    SELECT child.id FROM json_each(?) windows
+                    CROSS JOIN http_exchanges child INDEXED BY http_exchanges_ts
+                    WHERE child.ts >= json_extract(windows.value, '$.from')
+                      AND child.ts < json_extract(windows.value, '$.to')
+                      AND child.agent <> '' AND child.agent <> child.bundle_id AND child.app_name <> ''
+                      AND fl_agent_identity(child.agent, '') = json_extract(windows.value, '$.agent')
+                )
+                """
+        } else {
+            inspectionClause = inspectionOnly ? " AND \(hasMetadata)" : ""
+        }
+        let endClause = until == nil ? "" : " AND ts < ?"
         let cursorClause: String
         let cursorValues: [SQLValue]
         if let before, let beforeID {
@@ -3298,14 +3508,17 @@ final class TrafficDatabase: @unchecked Sendable {
         let limitClause = limit == nil ? "" : " LIMIT ?"
         var bindings: [SQLValue] = [.double(since.timeIntervalSince1970), .text(search), .text(like), .text(like),
                                     .text(like), .text(like), .text(like), .text(like), .text(like), .text(like)]
-            + focusValues + scopeValues + cursorValues
+            + focusValues + scopeValues
+        if let agentChildWindows { bindings.append(.text(agentChildWindows)) }
+        if let until { bindings.append(.double(until.timeIntervalSince1970)) }
+        bindings += cursorValues
         if let limit { bindings.append(.int(Int64(limit))) }
         return try conn.query("""
             SELECT id, ts, duration, scheme, host, port, method, path, status, req_headers, req_size, req_truncated, resp_headers,
                    resp_size, resp_truncated, content_type, pid, bundle_id, app_name, agent, agent_name, mcp_server, tool_calls, note,
                    tool_results, mcp, llm, mock_rule, guardrail, request_rewrite, response_transform
             FROM http_exchanges WHERE ts >= ? AND (? = '' OR host LIKE ? OR path LIKE ? OR app_name LIKE ? OR agent_name LIKE ? OR tool_calls LIKE ?
-                                                   OR mcp LIKE ? OR CAST(req_body AS TEXT) LIKE ? OR CAST(resp_body AS TEXT) LIKE ?)\(focusClause)\(scopeClause)\(riskClause)\(policyClause)\(cursorClause)
+                                                   OR mcp LIKE ? OR CAST(req_body AS TEXT) LIKE ? OR CAST(resp_body AS TEXT) LIKE ?)\(focusClause)\(scopeClause)\(riskClause)\(policyClause)\(inspectionClause)\(endClause)\(cursorClause)
             ORDER BY ts DESC, id DESC\(limitClause)
             """, bindings) { row in
             let decoder = JSONDecoder()
@@ -3327,11 +3540,57 @@ final class TrafficDatabase: @unchecked Sendable {
         }
     }
 
+    private struct AgentChildWindow: Encodable {
+        var agent: String
+        var from: TimeInterval
+        var to: TimeInterval
+    }
+
+    /// Each page holds bounded model/MCP exchanges plus a separately bounded page of attributed requests that
+    /// could fall in the selected calls' correlation windows. Unrelated proxy traffic cannot displace the calls.
+    func agentInspectionExchanges(since: Date, until: Date? = nil, limit: Int = 1_024,
+                                  childLimit: Int = 1_024, focus: FocusScope = .none) throws -> AgentExchangePage {
+        let cap = max(1, min(limit, 10_000))
+        let childCap = max(1, min(childLimit, 10_000))
+        let rows = try exchanges(since: since, limit: cap + 1, focus: focus,
+                                 includeAttributedChildren: true, inspectionOnly: true, until: until)
+        let metadata = Array(rows.prefix(cap))
+        var windowsByAgent: [String: [AgentChildWindow]] = [:]
+        for exchange in metadata where !exchange.toolCalls.isEmpty {
+            guard let agent = exchange.agent else { continue }
+            let at = exchange.started.addingTimeInterval(exchange.duration).timeIntervalSince1970
+            let identity = AgentCatalog.identityComparisonKey(agent)
+            windowsByAgent[identity, default: []].append(.init(agent: identity, from: at - 1,
+                                                               to: at + ToolCallLinks.window))
+        }
+        var windows: [AgentChildWindow] = []
+        for ranges in windowsByAgent.values {
+            var merged: [AgentChildWindow] = []
+            for range in ranges.sorted(by: { $0.from < $1.from }) {
+                if let last = merged.last, range.from <= last.to {
+                    merged[merged.count - 1].to = max(last.to, range.to)
+                } else {
+                    merged.append(range)
+                }
+            }
+            windows.append(contentsOf: merged)
+        }
+        guard !windows.isEmpty else { return AgentExchangePage(exchanges: metadata, hasMore: rows.count > cap) }
+        try registerAgentProjectionFunctions()
+        let encoded = String(decoding: try JSONEncoder().encode(windows), as: UTF8.self)
+        let children = try exchanges(since: since, limit: childCap + 1, focus: focus,
+                                     includeAttributedChildren: true, until: until, agentChildWindows: encoded)
+        return AgentExchangePage(exchanges: metadata + children.prefix(childCap),
+                                 hasMore: rows.count > cap || children.count > childCap)
+    }
+
     /// Every agent with at least one decrypted exchange in the complete selected window. This intentionally has no
     /// row limit: the inventory uses it as health evidence, while `exchanges` remains bounded for detail rendering.
-    func inspectedAgentIDs(since: Date, focus: FocusScope = .none) throws -> Set<String> {
+    func inspectedAgentIDs(since: Date, until: Date? = nil, focus: FocusScope = .none) throws -> Set<String> {
         var focusClause = ""
+        let endClause = until == nil ? "" : " AND ts < ?"
         var values: [SQLValue] = [.double(since.timeIntervalSince1970)]
+        if let until { values.append(.double(until.timeIntervalSince1970)) }
         if !focus.isEmpty {
             var parts: [String] = []
             if !focus.bundleIDs.isEmpty {
@@ -3349,7 +3608,7 @@ final class TrafficDatabase: @unchecked Sendable {
         }
         return Set(try conn.query("""
             SELECT DISTINCT agent FROM http_exchanges
-            WHERE ts >= ? AND agent != ''\(focusClause)
+            WHERE ts >= ? AND agent != ''\(endClause)\(focusClause)
             """, values) { $0.text(0) })
     }
 
@@ -3505,9 +3764,13 @@ final class TrafficDatabase: @unchecked Sendable {
 
     /// Open-alert counts grouped by their recorded app identity. The AI-agent inventory can join these compact rows
     /// against catalog aliases without loading every alert in the selected window.
-    func openAlertCounts(since: Date, focus: FocusScope = .none) throws -> [AgentOpenAlertCount] {
+    func openAlertCounts(since: Date, until: Date? = nil, focus: FocusScope = .none) throws -> [AgentOpenAlertCount] {
         var conditions = ["ts >= ?", "triage_state IN ('new','acknowledged','investigating')"]
         var values: [SQLValue] = [.int(Int64(since.timeIntervalSince1970))]
+        if let until {
+            conditions.append("ts < ?")
+            values.append(.int(Int64(until.timeIntervalSince1970)))
+        }
         if !focus.bundleIDs.isEmpty {
             conditions.append("bundle_id IN (\(Array(repeating: "?", count: focus.bundleIDs.count).joined(separator: ",")))")
             values += focus.bundleIDs.map { .text($0) }

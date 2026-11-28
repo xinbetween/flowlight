@@ -1324,6 +1324,8 @@ struct RulesView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
             .accessibilityIdentifier("policies.pack-catalog.details.toggle")
             .accessibilityLabel(L("Official catalog details"))
             .accessibilityValue(catalogDetailsExpanded ? L("Expanded") : L("Collapsed"))
@@ -2110,13 +2112,21 @@ struct RuleTemplateLibrary: View {
                             .font(.caption2).foregroundStyle(.tertiary)
                     }
                 }
+                .padding(12)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .accessibilityValue(isOpen ? L("Expanded") : L("Collapsed"))
+            .accessibilityHint(isOpen ? L("Collapse section") : L("Expand section"))
 
-            if isOpen { openCard(template) }
+            if isOpen {
+                openCard(template)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
+            }
         }
-        .padding(12)
         .background(.quaternary.opacity(isOpen ? 0.5 : 0.3), in: RoundedRectangle(cornerRadius: 10))
     }
 

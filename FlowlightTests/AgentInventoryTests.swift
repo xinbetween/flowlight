@@ -351,6 +351,83 @@ final class AgentInventoryTests: XCTestCase {
         XCTAssertEqual(item.health, .attention)
     }
 
+    func testGroupedDestinationCoverageUsesEveryIPAndProviderClassificationAcrossAliases() throws {
+        let outside = "203.0.113.1"
+        func row(_ identity: String, _ host: String, _ ip: String, owner: String = "") -> BreakdownRow {
+            BreakdownRow(bundleID: identity, appName: "Claude Code", appPath: "", domain: host, remoteIP: ip,
+                         ports: "443", protocols: "https", counters: .init(bytesOut: 1, flows: 1), owner: owner)
+        }
+        let traffic = AgentsModel.build(rows: [
+            row("claude", "shared.example", "192.0.2.1"),
+            row("claude", "shared.example", outside),
+            row("claude-code", "shared.example", "192.0.2.2"),
+        ], alerts: [])
+        // Inject competing owner evidence for the same hostless IP from each alias. The display label and primary
+        // provider are presentation fields and cannot exempt the other endpoint.
+        var summaries = traffic
+        for index in summaries.indices {
+            let isProvider = summaries[index].bundleID == "claude"
+            summaries[index].destinations.append(.init(
+                label: isProvider ? "OpenAI" : "Carrier", ip: "203.0.113.2", provider: isProvider ? "OpenAI" : nil,
+                protocols: ["https"], ports: "443", counters: .init(bytesOut: 1, flows: 1), hasHostname: false
+            ))
+        }
+        let policy = AgentPolicy(agentID: "claude-code", patterns: ["192.0.2.0/24"])
+        let item = try XCTUnwrap(AgentInventoryBuilder.build(.init(traffic: summaries, policies: [policy.agentID: policy])).first)
+        let destinations = try XCTUnwrap(item.summary).destinations
+        XCTAssertEqual(destinations.count, 2)
+        let shared = try XCTUnwrap(destinations.first { $0.label == "shared.example" })
+        XCTAssertEqual(Set(shared.representedEndpoints.map(\.ip)), ["192.0.2.1", "192.0.2.2", outside])
+        XCTAssertEqual(shared.counters.bytesOut, 3)
+        XCTAssertEqual(item.policy.status(for: shared), .mixed)
+        let hostless = try XCTUnwrap(destinations.first(where: \.isUnnamed))
+        XCTAssertEqual(hostless.allowPattern, "203.0.113.2")
+        XCTAssertEqual(Set(hostless.representedEndpoints.map(\.isProvider)), [true, false])
+        XCTAssertEqual(item.policy.status(for: hostless), .mixed)
+        XCTAssertEqual(item.policy.uncoveredDestinations, 2)
+    }
+
+    func testFullSQLitePolicyEvidenceClassifiesVisibleGroupsAndCountsOmittedDestinations() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("policy-projection-\(UUID()).sqlite")
+        let db = try TrafficDatabase(url: url)
+        let timestamp: Int64 = 1_800_000_000
+        let from = Date(timeIntervalSince1970: Double(timestamp))
+        func record(_ agent: String, _ host: String, _ ip: String, bytes: Int64) -> (Int64, FlowKey, FlowCounters) {
+            (timestamp, FlowKey(pid: 1, bundleID: agent, appName: "Claude Code", appPath: "", remoteIP: ip,
+                                domain: host, port: 443, transport: .tcp, appProtocol: "https"),
+             FlowCounters(bytesOut: bytes, flows: 1))
+        }
+        try db.insertAggregates("agg_1m", [
+            record("claude", "shared.example", "192.0.2.1", bytes: 900),
+            record("claude", "shared.example", "203.0.113.1", bytes: 1),
+            record("claude", "hidden.example", "203.0.113.2", bytes: 1),
+            record("claude-code", "shared.example", "192.0.2.2", bytes: 700),
+            record("claude-code", "shared.example", "203.0.113.3", bytes: 1),
+            record("claude-code", "api.anthropic.com", "203.0.113.4", bytes: 10),
+        ])
+        let projection = try db.agentTrafficProjection(.minute, from: from, to: from.addingTimeInterval(60), limit: 1)
+        let traffic = try AgentsModel.build(projection: projection, cancellation: TrafficReadCancellation())
+        let policy = AgentPolicy(agentID: "claude-code", allowAIProviders: false, patterns: ["192.0.2.0/24"])
+        var input = AgentInventoryInput(traffic: traffic, policies: [policy.agentID: policy],
+                                        policyEndpoints: projection.policyEndpoints)
+        let item = try XCTUnwrap(AgentInventoryBuilder.build(input).first)
+        let merged = try XCTUnwrap(item.summary)
+        XCTAssertEqual(merged.total.bytesOut, 1613)
+        XCTAssertEqual(merged.omittedRelationships, 4)
+        XCTAssertEqual(merged.destinations.map(\.label), ["shared.example"])
+        let visible = try XCTUnwrap(merged.destinations.first)
+        XCTAssertEqual(item.policy.status(for: visible), .mixed)
+        XCTAssertEqual(item.policy.uncoveredKeys, ["shared.example", "hidden.example", "api.anthropic.com"])
+        XCTAssertEqual(item.policy.uncoveredDestinations, 3)
+        XCTAssertFalse(item.policy.isPartial)
+
+        input.policyEndpoints = nil
+        let partial = try XCTUnwrap(AgentInventoryBuilder.build(input).first).policy
+        XCTAssertEqual(partial.status(for: visible), .allowed)
+        XCTAssertEqual(partial.uncoveredDestinations, 0)
+        XCTAssertTrue(partial.isPartial)
+    }
+
     func testReasonsHaveStableEvidenceRouteInspectionPolicyAlertOrder() throws {
         let traffic = summary(id: "claude", name: "Claude Code", otherHost: "uploads.example")
         let policy = AgentPolicy(agentID: "claude", enabled: true, patterns: [], enforce: false)

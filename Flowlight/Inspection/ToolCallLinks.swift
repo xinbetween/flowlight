@@ -15,29 +15,44 @@ enum ToolCallLinks {
 
     /// Exchange id → the tool call that caused it. `exchanges` may be in any order.
     static func link(_ exchanges: [HTTPExchange]) -> [Int64: Link] {
-        let calls = exchanges
+        // Group calls once by agent and keep them newest-first. The old implementation rebuilt a filtered copy of
+        // every call for every exchange, making a busy inspection window quadratic before any activity was shown.
+        let callsByAgent = Dictionary(grouping: exchanges
             .filter { !$0.toolCalls.isEmpty && $0.agent != nil }
-            .flatMap { e in e.toolCalls.map { (agent: e.agent!, at: e.started.addingTimeInterval(e.duration), call: $0) } }
-            .sorted { $0.at > $1.at }
-        guard !calls.isEmpty else { return [:] }
+            .flatMap { exchange in
+                exchange.toolCalls.map {
+                    (agent: exchange.agent!, at: exchange.started.addingTimeInterval(exchange.duration), call: $0)
+                }
+            }, by: \.agent)
+            .mapValues { $0.sorted { $0.at > $1.at } }
+        guard !callsByAgent.isEmpty else { return [:] }
         var links: [Int64: Link] = [:]
         for exchange in exchanges {
             guard let id = exchange.id, let agent = exchange.agent, exchange.via != nil else { continue }
-            let candidates = calls.filter {
-                $0.agent == agent && $0.at <= exchange.started.addingTimeInterval(1)
-                    && exchange.started.timeIntervalSince($0.at) < window
-            }
-            let host = exchange.host.lowercased()
+            let upper = exchange.started.addingTimeInterval(1)
+            let lower = exchange.started.addingTimeInterval(-window)
+            let candidates = callsByAgent[agent] ?? []
+            var hostMatch: Link?
+            var programMatch: Link?
             let program = exchange.appName.lowercased()
-            if let match = candidates.first(where: { mentions($0.call, host: host) }) {
-                links[id] = Link(call: match.call, requestedAt: match.at)
-            } else if let match = candidates.first(where: {
-                // Only for calls that don't name a URL: a call that names another host didn't cause this request
-                // (it may come from a hook or a background task that happens to use the same program).
-                exchange.started.timeIntervalSince($0.at) < 60 && runs($0.call, program: program) && !namesURL($0.call)
-            }) {
-                links[id] = Link(call: match.call, requestedAt: match.at)
+            let host = exchange.host.lowercased()
+            // The array is descending by request time, so skip future calls and stop once the ten-minute window is
+            // exhausted. Matching predicates remain the source of truth, including URL safety.
+            for candidate in candidates {
+                if candidate.at > upper { continue }
+                if candidate.at <= lower { break }
+                if hostMatch == nil && mentions(candidate.call, host: host) {
+                    hostMatch = Link(call: candidate.call, requestedAt: candidate.at)
+                    break
+                }
+                if programMatch == nil,
+                   exchange.started.timeIntervalSince(candidate.at) < 60,
+                   runs(candidate.call, program: program), !namesURL(candidate.call) {
+                    programMatch = Link(call: candidate.call, requestedAt: candidate.at)
+                }
             }
+            if let hostMatch { links[id] = hostMatch }
+            else if let programMatch { links[id] = programMatch }
         }
         return links
     }

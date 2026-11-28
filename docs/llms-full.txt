@@ -62,7 +62,7 @@ Documentation
 
  Using Flowlight
 
- Everything from the first launch to tuning the agent rules. Flowlight 0.18.11, macOS 15 or later.
+ Everything from the first launch to tuning the agent rules. Flowlight 0.18.12, macOS 15 or later.
 
  On this page
 
@@ -937,7 +937,7 @@ Understand your AI agents.
 
  brew install --cask xinbetween/tap/flowlightCopy
 
- v0.18.11macOS 15+UniversalGPL-3.0No telemetry
+ v0.18.12macOS 15+UniversalGPL-3.0No telemetry
 
  connectionslive
 
@@ -1681,8 +1681,19 @@ Releases
 
  Downloads, checksums and full notes for each version are on GitHub Releases.
 
+ 0.18.12
+November 27, 2026Latest
+
+ Review local agent settings in Advisories. The new default Agent tab checks supported settings for permissions, instructions, hooks, plugins, skills, MCP servers, gateways, and provider configuration. Software contains the package inventory and signed advisory matching.
+
+ Scan locally after one-time folder approval. Agent Advisories checks the home folder automatically, remembers additional folders you choose, skips protected locations, and reports incomplete coverage. Apple's on-device model summarizes structured findings by default, with an Inventory only option.
+
+ Keep AI Agents responsive under heavy traffic. Traffic aggregation runs off the main thread, alert counts update independently, and destination rows render as they come into view. Quiet agents remain visible, totals stay complete when detail is capped, and Tool calls show eligible linked requests from child processes. Issue #115
+
+ Improve software version evidence. Software Advisories reads additional executable metadata, compares supported Python and Go versions using their ecosystem rules, and distinguishes recorded versions from those it can use for matching.
+
  0.18.11
-November 25, 2026Latest
+November 25, 2026
 
  Make advisory catalog availability verifiable. Flowlight now ships the signed advisory catalog at the endpoint used by the app, so a missing public route no longer leaves every local artifact in the catalog-unavailable state.
 

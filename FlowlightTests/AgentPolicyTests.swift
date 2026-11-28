@@ -126,6 +126,88 @@ final class AgentPolicyTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testSQLiteWriteFailureRollsBackAliasReplacementAndReportsFailure() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("policy-fail-\(UUID()).sqlite")
+        let monitor = TrafficMonitor(databaseURL: url)
+        let original = AgentPolicy(agentID: "claude", patterns: ["original.example"])
+        try await monitor.db.asyncResult { db in
+            try db.savePolicy(original)
+            _ = try db.raw("""
+                CREATE TRIGGER reject_policy_replacement BEFORE INSERT ON agent_policies
+                WHEN NEW.agent_id = 'claude-code'
+                BEGIN SELECT RAISE(ABORT, 'injected policy write failure'); END
+                """) { _ in 0 }
+        }
+        let replacement = AgentPolicy(agentID: "claude-code", patterns: ["replacement.example"])
+        var edits = AgentPolicyEdits()
+        let token = try XCTUnwrap(edits.begin(replacement))
+        let result = await save(replacement, to: monitor)
+        edits.finish(result, agentID: replacement.agentID, token: token)
+
+        XCTAssertEqual(result, .writeFailed)
+        XCTAssertEqual(monitor.agentPolicyRevision, 0)
+        XCTAssertTrue(monitor.lastError?.contains("injected policy write failure") == true)
+        let persisted = try await monitor.read { try $0.loadPolicies() }
+        XCTAssertEqual(persisted, [original.agentID: original])
+        XCTAssertEqual(edits.resolved(over: persisted, identities: ["claude"]), original)
+        XCTAssertFalse(edits.hasOverlay(for: replacement.agentID))
+    }
+
+    @MainActor
+    func testCommittedSaveStillInvalidatesInventoryWhenRuntimeReloadFails() async throws {
+        struct ReloadFailure: LocalizedError {
+            var errorDescription: String? { "injected runtime reload failure" }
+        }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("policy-reload-\(UUID()).sqlite")
+        let monitor = TrafficMonitor(databaseURL: url, policyLoader: { _ in throw ReloadFailure() })
+        let policy = AgentPolicy(agentID: "claude", patterns: ["saved.example"], enforce: true)
+        let previousDataVersion = monitor.dataVersion
+        let result = await save(policy, to: monitor)
+
+        XCTAssertEqual(result, .committedReloadFailed(revision: 1))
+        XCTAssertEqual(monitor.agentPolicyRevision, 1)
+        XCTAssertGreaterThan(monitor.dataVersion, previousDataVersion)
+        XCTAssertTrue(monitor.lastError?.contains("injected runtime reload failure") == true)
+        let persisted = try await monitor.read { try $0.loadPolicies() }
+        XCTAssertEqual(persisted, [policy.agentID: policy])
+    }
+
+    @MainActor
+    private func save(_ policy: AgentPolicy, to monitor: TrafficMonitor) async -> AgentPolicySaveResult {
+        await withCheckedContinuation { continuation in
+            monitor.savePolicy(policy) { continuation.resume(returning: $0) }
+        }
+    }
+
+    func testPolicyEditReconcilesBySnapshotRevisionAndKeepsLatestAttempt() throws {
+        let original = AgentPolicy(agentID: "claude", patterns: ["original.example"])
+        let committed = AgentPolicy(agentID: "claude-code", patterns: ["committed.example"])
+        let failed = AgentPolicy(agentID: "claude-code", patterns: ["failed.example"])
+        let newer = AgentPolicy(agentID: "Claude Code", patterns: ["newer.example"])
+        let oldSnapshot = [original.agentID: original]
+        let identities = ["claude", "Claude Code", "claude-code"]
+        var edits = AgentPolicyEdits()
+        let firstToken = try XCTUnwrap(edits.begin(committed))
+        XCTAssertNil(edits.begin(original), "aliases must share a single pending write")
+        edits.reconcile(snapshotRevision: 0)
+        XCTAssertEqual(edits.resolved(over: oldSnapshot, identities: identities), committed)
+        edits.finish(.committedReloadFailed(revision: 1), agentID: committed.agentID, token: firstToken)
+        XCTAssertFalse(edits.isSaving(original.agentID))
+        edits.reconcile(snapshotRevision: 0)
+        XCTAssertEqual(edits.resolved(over: oldSnapshot, identities: identities), committed)
+
+        let secondToken = try XCTUnwrap(edits.begin(failed))
+        edits.finish(.writeFailed, agentID: committed.agentID, token: firstToken)
+        XCTAssertEqual(edits.resolved(over: oldSnapshot, identities: identities), failed)
+        edits.finish(.writeFailed, agentID: failed.agentID, token: secondToken)
+        XCTAssertEqual(edits.resolved(over: oldSnapshot, identities: identities), committed)
+
+        edits.reconcile(snapshotRevision: 2)
+        XCTAssertEqual(edits.resolved(over: [newer.agentID: newer], identities: identities), newer)
+        XCTAssertFalse(edits.hasOverlay(for: committed.agentID))
+    }
+
     func testPolicyResolutionIsStableForLegacyAliasDuplicates() {
         let policies = [
             AgentPolicy(agentID: "claude-code", patterns: ["second.example"]),

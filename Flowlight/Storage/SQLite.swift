@@ -38,6 +38,23 @@ struct SQLRow {
     }
 }
 
+/// Shared by a main-actor request and the work queued on the database connection.
+final class TrafficReadCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    var isCancelled: Bool { lock.withLock { cancelled } }
+    func cancel() { lock.withLock { cancelled = true } }
+    func check() throws {
+        if isCancelled { throw CancellationError() }
+    }
+}
+
+private final class SQLiteTextFunction {
+    let call: (String, String) -> String?
+    init(_ call: @escaping (String, String) -> String?) { self.call = call }
+}
+
 /// Minimal SQLite wrapper. Not thread-safe; callers serialize access on a queue.
 final class SQLiteConnection {
     private var db: OpaquePointer?
@@ -103,16 +120,21 @@ final class SQLiteConnection {
         guard rc == SQLITE_DONE || rc == SQLITE_ROW else { throw SQLiteError.step(String(cString: sqlite3_errmsg(db))) }
     }
 
-    func query<T>(_ sql: String, _ values: [SQLValue] = [], map: (SQLRow) -> T) throws -> [T] {
+    func forEachRow(_ sql: String, _ values: [SQLValue] = [], _ visit: (SQLRow) throws -> Void) throws {
         let stmt = try prepared(sql)
+        defer { sqlite3_reset(stmt) }
         bind(stmt, values)
-        var results: [T] = []
         while true {
             let rc = sqlite3_step(stmt)
-            if rc == SQLITE_ROW { results.append(map(SQLRow(stmt: stmt))) }
+            if rc == SQLITE_ROW { try visit(SQLRow(stmt: stmt)) }
             else if rc == SQLITE_DONE { break }
             else { throw SQLiteError.step(String(cString: sqlite3_errmsg(db))) }
         }
+    }
+
+    func query<T>(_ sql: String, _ values: [SQLValue] = [], map: (SQLRow) -> T) throws -> [T] {
+        var results: [T] = []
+        try forEachRow(sql, values) { results.append(map($0)) }
         return results
     }
 
@@ -138,6 +160,44 @@ final class SQLiteConnection {
             try? execute("ROLLBACK")
             throw error
         }
+    }
+
+    /// Scope the progress handler to one serialized read and remove it before committing or rolling back.
+    func withCancellation<T>(_ cancellation: TrafficReadCancellation, _ body: () throws -> T) throws -> T {
+        try cancellation.check()
+        sqlite3_progress_handler(db, 1_000, { context in
+            guard let context else { return 0 }
+            return Unmanaged<TrafficReadCancellation>.fromOpaque(context).takeUnretainedValue().isCancelled ? 1 : 0
+        }, Unmanaged.passUnretained(cancellation).toOpaque())
+        defer { sqlite3_progress_handler(db, 0, nil, nil) }
+        do {
+            let result = try body()
+            try cancellation.check()
+            return result
+        } catch {
+            try cancellation.check()
+            throw error
+        }
+    }
+
+    /// A deterministic two-text-argument function for sharing domain classification with SQL projections.
+    func registerTextFunction(_ name: String, _ call: @escaping (String, String) -> String?) throws {
+        let context = Unmanaged.passRetained(SQLiteTextFunction(call)).toOpaque()
+        let rc = sqlite3_create_function_v2(db, name, 2, SQLITE_UTF8 | SQLITE_DETERMINISTIC, context, { result, _, arguments in
+            guard let context = sqlite3_user_data(result), let arguments else { return }
+            func text(_ argument: OpaquePointer?) -> String {
+                sqlite3_value_text(argument).map { String(cString: $0) } ?? ""
+            }
+            let function = Unmanaged<SQLiteTextFunction>.fromOpaque(context).takeUnretainedValue()
+            if let value = function.call(text(arguments[0]), text(arguments[1])) {
+                sqlite3_result_text(result, value, -1, SQLITE_TRANSIENT)
+            } else {
+                sqlite3_result_null(result)
+            }
+        }, nil, nil, { context in
+            if let context { Unmanaged<SQLiteTextFunction>.fromOpaque(context).release() }
+        })
+        guard rc == SQLITE_OK else { throw SQLiteError.step(String(cString: sqlite3_errmsg(db))) }
     }
 
     var changes: Int { Int(sqlite3_changes(db)) }

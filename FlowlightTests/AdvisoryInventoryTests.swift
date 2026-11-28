@@ -49,6 +49,10 @@ final class AdvisoryInventoryTests: XCTestCase {
         XCTAssertEqual(result.artifacts.first(where: { $0.kind == .homebrewFormula })?.versionEvidence, .homebrewInstallReceipt)
         XCTAssertEqual(result.artifacts.first(where: { $0.kind == .nodePackage })?.versionEvidence, .packageJSON)
         XCTAssertEqual(Set(result.artifacts.map(\.kind)).count, 5)
+        let installed = try XCTUnwrap(result.sources.first { $0.source == L("Packages & Executables") })
+        XCTAssertEqual(installed.discovered, 3)
+        XCTAssertTrue(installed.complete)
+        XCTAssertFalse(result.sources.contains { $0.source == L("Homebrew") || $0.source == L("Executables") })
     }
 
     func testApplicationCopiesWithSameBundleIDRemainSeparateForAdvisories() throws {
@@ -83,9 +87,13 @@ final class AdvisoryInventoryTests: XCTestCase {
         let result = AdvisoryInventoryScanner(configuration: config).scan()
 
         XCTAssertTrue(result.artifacts.filter { $0.kind == .homebrewFormula }.isEmpty)
+        let installed = try XCTUnwrap(result.sources.first { $0.source == L("Packages & Executables") })
+        XCTAssertFalse(installed.complete)
+        XCTAssertEqual(installed.detail, L("One or more Homebrew locations could not be read."))
+        XCTAssertFalse(result.complete)
     }
 
-    func testSelectedProjectTraversalSkipsSymlinksAndReportsMalformedManifestAsIncomplete() throws {
+    func testSelectedProjectTraversalReportsMalformedManifestAsIncomplete() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-inventory-project-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         let packageDirectory = root.appendingPathComponent("node_modules/example")
@@ -102,6 +110,110 @@ final class AdvisoryInventoryTests: XCTestCase {
         XCTAssertEqual(result.artifacts.filter { $0.kind == .nodePackage }.map(\.identifier), ["example"])
         XCTAssertFalse(source.complete)
         XCTAssertFalse(result.complete)
+    }
+
+    func testPackageScanDoesNotFollowDirectoryManifestOrRootSymlinks() throws {
+        let manager = FileManager.default
+        let temp = manager.temporaryDirectory.appendingPathComponent("advisory-package-links-\(UUID().uuidString)")
+        defer { try? manager.removeItem(at: temp) }
+        let root = temp.appendingPathComponent("project")
+        let outside = temp.appendingPathComponent("outside")
+        let outsidePackage = outside.appendingPathComponent("node_modules/outside-package")
+        let insidePackage = root.appendingPathComponent("node_modules/inside-package")
+        let linkedPackage = root.appendingPathComponent("node_modules/linked-manifest")
+        for directory in [outsidePackage, insidePackage, linkedPackage] {
+            try manager.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        let outsideManifest = outsidePackage.appendingPathComponent("package.json")
+        try Data(#"{"name":"outside-package","version":"1.0.0"}"#.utf8).write(to: outsideManifest)
+        try Data(#"{"name":"inside-package","version":"1.0.0"}"#.utf8).write(to: insidePackage.appendingPathComponent("package.json"))
+        try manager.createSymbolicLink(at: root.appendingPathComponent("linked-tree"), withDestinationURL: outside)
+        try manager.createSymbolicLink(at: linkedPackage.appendingPathComponent("package.json"), withDestinationURL: outsideManifest)
+        let outsideRequirements = outside.appendingPathComponent("requirements.txt")
+        try Data("linked-package==1.0.0\n".utf8).write(to: outsideRequirements)
+        try manager.createSymbolicLink(at: root.appendingPathComponent("requirements.txt"), withDestinationURL: outsideRequirements)
+        let linkedRoot = temp.appendingPathComponent("linked-root")
+        try manager.createSymbolicLink(at: linkedRoot, withDestinationURL: outside)
+
+        let config = AdvisoryInventoryScanner.Configuration(
+            applicationRoots: [], executableRoots: [], homebrewPrefixes: [],
+            selectedProjectRoots: [root, linkedRoot].map { AdvisoryInventoryRoot(path: $0.path, userSelected: true) }
+        )
+        let result = AdvisoryInventoryScanner(configuration: config).scan()
+
+        XCTAssertEqual(result.artifacts.map(\.identifier), ["inside-package"])
+        XCTAssertFalse(try XCTUnwrap(result.sources.first { $0.source == root.path }).complete)
+        let linkedSource = try XCTUnwrap(result.sources.first { $0.source == linkedRoot.path })
+        XCTAssertFalse(linkedSource.complete)
+        XCTAssertEqual(linkedSource.discovered, 0)
+    }
+
+    func testProjectAndHomeEntryBudgetsCountHiddenAndIrrelevantFiles() throws {
+        let manager = FileManager.default
+        let root = manager.temporaryDirectory.appendingPathComponent("advisory-wide-directory-\(UUID().uuidString)")
+        defer { try? manager.removeItem(at: root) }
+        try manager.createDirectory(at: root, withIntermediateDirectories: true)
+        for index in 0..<80 {
+            let name = index.isMultiple(of: 2) ? ".hidden-\(index)" : "unrelated-\(index).txt"
+            try Data().write(to: root.appendingPathComponent(name))
+        }
+        var config = AdvisoryInventoryScanner.Configuration(
+            applicationRoots: [], executableRoots: [], homebrewPrefixes: [],
+            selectedProjectRoots: [AdvisoryInventoryRoot(path: root.path, userSelected: true)],
+            maximumProjectEntries: 3, maximumHomeEntries: 3
+        )
+        func complete(_ source: String) throws -> Bool {
+            let result = AdvisoryInventoryScanner(configuration: config).scan()
+            return try XCTUnwrap(result.sources.first { $0.source == source }).complete
+        }
+
+        XCTAssertFalse(try complete(root.path))
+        config.maximumProjectEntries = 80
+        XCTAssertTrue(try complete(root.path))
+        config.selectedProjectRoots = []
+        config.homePackageRoot = root.path
+        XCTAssertFalse(try complete(L("Home folder")))
+        config.maximumHomeEntries = 80
+        XCTAssertTrue(try complete(L("Home folder")))
+    }
+
+    func testRootPackageManifestsTakePriorityOverSubtreesUnderBothCaps() throws {
+        let manager = FileManager.default
+        let temp = manager.temporaryDirectory.appendingPathComponent("advisory-root-manifest-priority-\(UUID().uuidString)")
+        defer { try? manager.removeItem(at: temp) }
+        let manifests = [
+            (name: "requirements.txt", artifact: "requests", text: "requests==2.32.3\n"),
+            (name: "Cargo.lock", artifact: "serde", text: "[[package]]\nname = \"serde\"\nversion = \"1.0.210\"\n"),
+        ]
+        // Swap the file and directory roles while keeping root entry names and creation order fixed.
+        // This exercises the directory-first case without relying on one filesystem's filename ordering.
+        for fileIndex in manifests.indices {
+            let root = temp.appendingPathComponent("project-\(fileIndex)")
+            try manager.createDirectory(at: root, withIntermediateDirectories: true)
+            for (index, manifest) in manifests.enumerated() {
+                let entry = root.appendingPathComponent(manifest.name)
+                if index == fileIndex {
+                    try Data(manifest.text.utf8).write(to: entry)
+                } else {
+                    let package = entry.appendingPathComponent("node_modules/dependency/package.json")
+                    try manager.createDirectory(at: package.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try Data(#"{"name":"dependency","version":"1.0.0"}"#.utf8).write(to: package)
+                }
+            }
+            for (entries, artifacts) in [(2, 100), (100, 1)] {
+                let config = AdvisoryInventoryScanner.Configuration(
+                    applicationRoots: [], executableRoots: [], homebrewPrefixes: [],
+                    selectedProjectRoots: [AdvisoryInventoryRoot(path: root.path, userSelected: true)],
+                    maximumPackageArtifacts: artifacts, maximumProjectEntries: entries
+                )
+                let result = AdvisoryInventoryScanner(configuration: config).scan()
+                let source = try XCTUnwrap(result.sources.first { $0.source == root.path })
+                XCTAssertEqual(result.artifacts.map(\.identifier), [manifests[fileIndex].artifact],
+                               "Entry cap \(entries), artifact cap \(artifacts)")
+                XCTAssertEqual(source.discovered, 1)
+                XCTAssertFalse(source.complete)
+            }
+        }
     }
 
     func testNodePackageArtifactsRespectTheAggregateCapAndReportIncompleteSource() throws {
@@ -124,6 +236,108 @@ final class AdvisoryInventoryTests: XCTestCase {
         XCTAssertEqual(result.artifacts.filter { $0.kind == .nodePackage }.count, 2)
         XCTAssertFalse(source.complete)
         XCTAssertFalse(result.complete)
+    }
+
+    func testHomeScanRecursivelyFindsHomePackagesAndSkipsGeneratedTrees() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-home-scan-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let visible = home.appendingPathComponent("workspace/node_modules/home-package/package.json")
+        let selected = home.appendingPathComponent("project/node_modules/selected-package/package.json")
+        let protectedPackage = home.appendingPathComponent("Documents/node_modules/private-package/package.json")
+        let hiddenPackage = home.appendingPathComponent(".hidden/node_modules/hidden-package/package.json")
+        let generatedPackage = home.appendingPathComponent("build/node_modules/generated-package/package.json")
+        for url in [visible, selected, protectedPackage, hiddenPackage, generatedPackage] {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("{\"name\":\"\(url.deletingLastPathComponent().lastPathComponent)\",\"version\":\"1.0.0\"}".utf8).write(to: url)
+        }
+
+        let config = AdvisoryInventoryScanner.Configuration(
+            applicationRoots: [], executableRoots: [], homebrewPrefixes: [],
+            selectedProjectRoots: [AdvisoryInventoryRoot(path: home.appendingPathComponent("project").path, userSelected: true)],
+            homePackageRoot: home.path,
+            maximumHomeDepth: 8,
+            maximumHomeVisits: 500,
+            maximumHomePackageArtifacts: 50
+        )
+        let result = AdvisoryInventoryScanner(configuration: config).scan()
+        let packages = result.artifacts.filter { $0.kind == .nodePackage }
+
+        XCTAssertEqual(Set(packages.map(\.identifier)), Set(["home-package", "selected-package", "private-package"]))
+        XCTAssertEqual(packages.filter { $0.identifier == "selected-package" }.count, 1)
+        let homeSource = try XCTUnwrap(result.sources.first(where: { $0.source == L("Home folder") }))
+        XCTAssertTrue(homeSource.complete)
+        XCTAssertTrue(homeSource.detail?.contains("depth 8") == true)
+    }
+
+    func testHomeScanRespectsIndependentDepthAndArtifactCaps() throws {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-home-caps-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        for index in 0..<4 {
+            let manifest = home.appendingPathComponent("level-\(index)/node_modules/package-\(index)/package.json")
+            try FileManager.default.createDirectory(at: manifest.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data("{\"name\":\"package-\(index)\",\"version\":\"1.0.\(index)\"}".utf8).write(to: manifest)
+        }
+
+        let config = AdvisoryInventoryScanner.Configuration(
+            applicationRoots: [], executableRoots: [], homebrewPrefixes: [], selectedProjectRoots: [],
+            homePackageRoot: home.path,
+            maximumHomeDepth: 2,
+            maximumHomeVisits: 500,
+            maximumHomePackageArtifacts: 1
+        )
+        let result = AdvisoryInventoryScanner(configuration: config).scan()
+        let source = try XCTUnwrap(result.sources.first(where: { $0.source == L("Home folder") }))
+
+        XCTAssertLessThanOrEqual(result.artifacts.filter { $0.kind == .nodePackage }.count, 1)
+        XCTAssertFalse(source.complete)
+    }
+
+    func testHomeScanPreferenceDefaultsToEnabledAndRoundTripsWithoutChangingSelectedRoots() {
+        let defaults = UserDefaults.standard
+        let enabledKey = AdvisoryInventoryPreferences.homeScanEnabledKey
+        let rootsKey = AdvisoryInventoryPreferences.selectedProjectRootsKey
+        let bookmarksKey = AdvisoryInventoryPreferences.selectedProjectBookmarksKey
+        let oldEnabled = defaults.object(forKey: enabledKey)
+        let oldRoots = defaults.object(forKey: rootsKey)
+        let oldBookmarks = defaults.object(forKey: bookmarksKey)
+        defer {
+            if let oldEnabled { defaults.set(oldEnabled, forKey: enabledKey) } else { defaults.removeObject(forKey: enabledKey) }
+            if let oldRoots { defaults.set(oldRoots, forKey: rootsKey) } else { defaults.removeObject(forKey: rootsKey) }
+            if let oldBookmarks { defaults.set(oldBookmarks, forKey: bookmarksKey) } else { defaults.removeObject(forKey: bookmarksKey) }
+        }
+
+        defaults.removeObject(forKey: enabledKey)
+        XCTAssertTrue(AdvisoryInventoryPreferences.homeScanEnabled)
+        AdvisoryInventoryPreferences.setHomeScanEnabled(false)
+        XCTAssertFalse(AdvisoryInventoryPreferences.homeScanEnabled)
+        AdvisoryInventoryPreferences.setHomeScanEnabled(true)
+        XCTAssertTrue(AdvisoryInventoryPreferences.homeScanEnabled)
+    }
+
+    func testPyProjectStaticProjectMetadataUsesPEP440Evidence() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-pyproject-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let pyproject = """
+        [tool.other]
+        name = "wrong-name"
+        version = "9.9.9"
+
+        [project]
+        version = "1.0b11"
+        name = "example-python"
+        """
+        try Data(pyproject.utf8).write(to: root.appendingPathComponent("pyproject.toml"))
+
+        let config = AdvisoryInventoryScanner.Configuration(
+            applicationRoots: [], executableRoots: [], homebrewPrefixes: [],
+            selectedProjectRoots: [AdvisoryInventoryRoot(path: root.path, userSelected: true)]
+        )
+        let packages = AdvisoryInventoryScanner(configuration: config).scan().artifacts.filter { $0.kind == .package }
+        let package = try XCTUnwrap(packages.first(where: { $0.identifier == "example-python" }))
+        XCTAssertEqual(package.version, "1.0b11")
+        XCTAssertEqual(package.versionScheme, .pep440)
+        XCTAssertTrue(package.hasVersionEvidence)
     }
 
     func testSelectedProjectScanExtractsBoundedMetadataForSupportedPackageManagers() throws {
@@ -156,8 +370,8 @@ final class AdvisoryInventoryTests: XCTestCase {
         XCTAssertEqual(Set(packages.compactMap(\.packageManager)), Set([
             .pip, .cargo, .goModules, .bundler, .composer, .maven, .gradle, .nuget, .swiftPM, .mix
         ]))
-        XCTAssertTrue(packages.contains { $0.identifier == "requests" && $0.version == "2.32.3" })
-        XCTAssertTrue(packages.contains { $0.identifier == "github.com/example/dep" && $0.version == "1.2.3" })
+        XCTAssertTrue(packages.contains { $0.identifier == "requests" && $0.version == "2.32.3" && $0.hasVersionEvidence })
+        XCTAssertTrue(packages.contains { $0.identifier == "github.com/example/dep" && $0.version == "1.2.3" && $0.versionScheme == .goModule && $0.hasVersionEvidence })
         XCTAssertTrue(result.sources.first?.complete == true)
     }
 
@@ -234,6 +448,33 @@ final class AdvisoryInventoryTests: XCTestCase {
         XCTAssertEqual(enriched.id, artifact.id)
     }
 
+    func testProbeUsesCanonicalExecutablePathWithDirectoryAlias() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-probe-alias-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let executable = root.appendingPathComponent("curl-real")
+        try Data("not executed".utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+        let recorder = ProbeRecorder()
+        let artifact = AdvisoryArtifact(kind: .executable, identifier: "curl", name: "curl", path: executable.standardizedFileURL.path,
+                                        version: nil, versionScheme: .opaque, identityEvidence: .executablePath,
+                                        versionEvidence: nil, source: "Executable path", iconPath: executable.path,
+                                        executionAlias: "curl")
+        let probe = ExecutableVersionProbe(
+            runner: { url, arguments, _ in
+                recorder.record(url: url.path, arguments: arguments)
+                return ExecutableVersionProbe.RawResult(output: Data("curl 8.10.1\n".utf8), exitCode: 0)
+            },
+            pathValidator: { $0.path == executable.standardizedFileURL.path }
+        )
+
+        let result = await probe.probe(artifact)
+
+        XCTAssertEqual(result, .init(status: .found, version: "8.10.1"))
+        XCTAssertEqual(recorder.path, executable.standardizedFileURL.path)
+        XCTAssertEqual(recorder.arguments, ["--version"])
+    }
+
     func testDefaultProbeCanReadAKnownSystemExecutableVersion() async throws {
         let path = "/usr/bin/curl"
         try XCTSkipUnless(FileManager.default.isExecutableFile(atPath: path))
@@ -258,7 +499,7 @@ final class AdvisoryInventoryTests: XCTestCase {
         let artifact = AdvisoryArtifact(kind: .executable, identifier: "curl", name: "curl", path: executable.path,
                                         version: nil, versionScheme: .opaque, identityEvidence: .executablePath,
                                         versionEvidence: nil, source: "Executable path", iconPath: executable.path)
-        let probe = ExecutableVersionProbe(configuration: .init(timeout: 0.05, terminationGrace: 0.05))
+        let probe = ExecutableVersionProbe(configuration: .init(timeout: 0.05, terminationGrace: 0.05), pathValidator: { _ in true })
         let started = Date()
 
         let result = await probe.probe(artifact)
@@ -284,6 +525,233 @@ final class AdvisoryInventoryTests: XCTestCase {
 
         XCTAssertEqual(result, .notAttempted)
         XCTAssertNil(recorder.path)
+    }
+
+    func testExecutableMetadataReadsMachOSourceAndPerlVersionsWithoutExecuting() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-executable-metadata-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let macho = root.appendingPathComponent("native-tool")
+        let script = root.appendingPathComponent("script-tool")
+        try thinMachO(sourceVersion: (6, 0, 2)).write(to: macho)
+        try Data("#!/usr/bin/perl\nour $VERSION = '1.125'; # VERSION\n".utf8).write(to: script)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+
+        XCTAssertEqual(ExecutableVersionProbe.metadataVersion(at: macho), .init(version: "6.0.2", evidence: .machOSourceVersion))
+        XCTAssertEqual(ExecutableVersionProbe.metadataVersion(at: script), .init(version: "1.125", evidence: .executableMetadata))
+
+        let shellScript = root.appendingPathComponent("shell-tool")
+        try Data("#!/bin/sh\n$VERSION = '1.125'\n".utf8).write(to: shellScript)
+        XCTAssertNil(ExecutableVersionProbe.metadataVersion(at: shellScript))
+    }
+
+    func testExecutableMetadataReadsFatMachOSliceAndRejectsMalformedData() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-fat-metadata-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let fat = root.appendingPathComponent("fat-tool")
+        let malformed = root.appendingPathComponent("malformed-tool")
+        try fatMachO(sourceVersion: (37, 0, 0)).write(to: fat)
+        try Data([0xca, 0xfe, 0xba, 0xbe, 0, 0, 0, 1]).write(to: malformed)
+
+        XCTAssertEqual(ExecutableVersionProbe.metadataVersion(at: fat), .init(version: "37.0", evidence: .machOSourceVersion))
+        XCTAssertNil(ExecutableVersionProbe.metadataVersion(at: malformed))
+    }
+
+    func testFatMachOMetadataUsesPreferredSparseSliceWithinReadBudget() throws {
+        #if arch(arm64)
+        let preferred: UInt32 = 0x0100000c
+        let other: UInt32 = 0x01000007
+        #else
+        let preferred: UInt32 = 0x01000007
+        let other: UInt32 = 0x0100000c
+        #endif
+        let manager = FileManager.default
+        let root = manager.temporaryDirectory.appendingPathComponent("advisory-sparse-fat-\(UUID().uuidString)")
+        defer { try? manager.removeItem(at: root) }
+        try manager.createDirectory(at: root, withIntermediateDirectories: true)
+        let preferredHeader = thinMachO(sourceVersion: (2048, 2, 3), cpu: preferred)
+        let otherHeader = thinMachO(sourceVersion: (9, 9, 9), cpu: other)
+        let otherOffset: UInt64 = 4096
+        let sliceSize: UInt64 = 2 * 1024 * 1024
+        for is64 in [false, true] {
+            let preferredOffset: UInt64 = is64 ? 1 << 32 : 4 * 1024 * 1024
+            let fat = root.appendingPathComponent(is64 ? "fat64" : "fat32")
+            let table = fatTable(is64: is64, slices: [
+                (other, otherOffset, UInt64(otherHeader.count)), (preferred, preferredOffset, sliceSize),
+            ])
+            try table.write(to: fat)
+            let file = try FileHandle(forWritingTo: fat)
+            defer { try? file.close() }
+            try file.seek(toOffset: otherOffset)
+            try file.write(contentsOf: otherHeader)
+            try file.seek(toOffset: preferredOffset)
+            try file.write(contentsOf: preferredHeader)
+            try file.truncate(atOffset: preferredOffset + sliceSize)
+
+            let bytes = table.count + preferredHeader.count
+            XCTAssertEqual(ExecutableVersionProbe.metadataVersion(at: fat, maximumBytes: bytes),
+                           .init(version: "2048.2.3", evidence: .machOSourceVersion))
+            XCTAssertNil(ExecutableVersionProbe.metadataVersion(at: fat, maximumBytes: bytes - 1))
+        }
+    }
+
+    func testFatMachOMetadataRejectsOutOfBoundsSlicesAndTruncatedSourceCommands() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-fat-ranges-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let fat = root.appendingPathComponent("fat-tool")
+        let cpu: UInt32 = 0x0100000c
+        let offset = 0x100
+        let header = thinMachO(sourceVersion: (1, 2, 3), cpu: cpu)
+        func write(_ slice: Data, size: UInt64, declaredOffset: UInt64? = nil) throws {
+            var data = fatTable(is64: true, slices: [(cpu, declaredOffset ?? UInt64(offset), size)])
+            data.append(Data(count: offset - data.count))
+            data.append(slice)
+            try data.write(to: fat)
+        }
+        for size in [UInt64(28), 40, UInt64(header.count) + 1, UInt64.max] {
+            try write(header, size: size)
+            XCTAssertNil(ExecutableVersionProbe.metadataVersion(at: fat), "Invalid FAT slice size \(size)")
+        }
+        for invalidOffset in [UInt64(8), UInt64(Int64.max) + 1, UInt64.max] {
+            try write(header, size: UInt64(header.count), declaredOffset: invalidOffset)
+            XCTAssertNil(ExecutableVersionProbe.metadataVersion(at: fat), "Invalid FAT slice offset \(invalidOffset)")
+        }
+        var shortCommand = header
+        shortCommand.replaceSubrange(20..<24, with: littleEndian(UInt32(8))) // sizeofcmds
+        shortCommand.replaceSubrange(36..<40, with: littleEndian(UInt32(8))) // cmdsize
+        try write(shortCommand, size: UInt64(shortCommand.count))
+        XCTAssertNil(ExecutableVersionProbe.metadataVersion(at: fat))
+    }
+
+    func testExecutableMetadataReadsLiteralBundleWrapperTargetWithoutExecutingIt() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-wrapper-metadata-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let contents = root.appendingPathComponent("Example.app/Contents")
+        let wrapper = root.appendingPathComponent("bin/example-wrapper")
+        try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: wrapper.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let plist: [String: Any] = ["CFBundleShortVersionString": "7.1.10", "CFBundleVersion": "710",
+                                    "CFBundleExecutable": "example-wrapper"]
+        try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+            .write(to: contents.appendingPathComponent("Info.plist"))
+        let target = contents.appendingPathComponent("MacOS/example-wrapper")
+        try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let source = thinMachO(sourceVersion: (999, 0, 0))
+        try source.write(to: target)
+        try Data("#!/bin/bash\nexec \(target.path) \"$@\"\n".utf8).write(to: wrapper)
+
+        let evidence = ExecutableVersionProbe.MetadataVersion(version: "7.1.10", evidence: .executableMetadata)
+        XCTAssertEqual(ExecutableVersionProbe.metadataVersion(at: wrapper), evidence)
+        XCTAssertEqual(ExecutableVersionProbe.metadataVersion(at: target), evidence)
+        let unrelated = target.deletingLastPathComponent().appendingPathComponent("unrelated")
+        try source.write(to: unrelated)
+        XCTAssertEqual(ExecutableVersionProbe.metadataVersion(at: unrelated), .init(version: "999.0", evidence: .machOSourceVersion))
+    }
+
+    func testConfiguredExecutableScanRecordsMachOSourceVersionForDisplayOnly() throws {
+        let manager = FileManager.default
+        let root = manager.temporaryDirectory.appendingPathComponent("advisory-source-version-\(UUID().uuidString)")
+        defer { try? manager.removeItem(at: root) }
+        try manager.createDirectory(at: root, withIntermediateDirectories: true)
+        let executable = root.appendingPathComponent("curl")
+        try thinMachO(sourceVersion: (8, 10, 1)).write(to: executable)
+        try manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+        let config = AdvisoryInventoryScanner.Configuration(
+            applicationRoots: [], executableRoots: [root.path], homebrewPrefixes: [], selectedProjectRoots: []
+        )
+        var artifact = try XCTUnwrap(AdvisoryInventoryScanner(configuration: config).scan().artifacts.first {
+            $0.kind == .executable && $0.identifier == "curl"
+        })
+        XCTAssertEqual(artifact.version, "8.10.1")
+        XCTAssertEqual(artifact.versionEvidence, .machOSourceVersion)
+        XCTAssertTrue(artifact.hasRecordedVersionEvidence)
+        XCTAssertFalse(artifact.hasVersionEvidence)
+
+        let match = AdvisoryCPEMatch(criteria: "cpe:2.3:a:example:curl:*:*:*:*:*:*:*:*",
+                                     targets: [AdvisoryTarget(kind: .executable, identifier: "curl")],
+                                     versionStartIncluding: "8.0", versionEndExcluding: "9.0")
+        XCTAssertFalse(VersionRangeMatcher.matches(artifact, match: match))
+        artifact.versionEvidence = .executableVersionProbe
+        XCTAssertTrue(artifact.hasVersionEvidence)
+        XCTAssertTrue(VersionRangeMatcher.matches(artifact, match: match))
+    }
+
+    func testDefaultProbeRejectsSetIDAndShebangExecutablesBeforeRunner() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("advisory-probe-safety-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let script = root.appendingPathComponent("curl")
+        try Data("#!/bin/sh\necho curl 9.9.9\n".utf8).write(to: script)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        let artifact = AdvisoryArtifact(kind: .executable, identifier: "curl", name: "curl", path: script.path,
+                                        version: nil, versionScheme: .opaque, identityEvidence: .executablePath,
+                                        versionEvidence: nil, source: "Executable path", iconPath: nil)
+        let recorder = ProbeRecorder()
+        let probe = ExecutableVersionProbe(runner: { _, _, _ in
+            recorder.record(url: "unexpected", arguments: [])
+            return ExecutableVersionProbe.RawResult(output: Data("curl 9.9.9".utf8), exitCode: 0)
+        })
+
+        let result = await probe.probe(artifact)
+
+        XCTAssertEqual(result.status, .unavailable)
+        XCTAssertNil(recorder.path)
+    }
+
+    private func thinMachO(sourceVersion: (UInt64, UInt64, UInt64), cpu: UInt32 = 0x0100000c) -> Data {
+        var data = Data([0xcf, 0xfa, 0xed, 0xfe])
+        data.append(contentsOf: littleEndian(cpu))
+        data.append(contentsOf: Array(repeating: UInt8(0), count: 8))
+        data.append(contentsOf: littleEndian(UInt32(1)))
+        data.append(contentsOf: littleEndian(UInt32(16)))
+        data.append(contentsOf: Array(repeating: UInt8(0), count: 8))
+        data.append(contentsOf: littleEndian(UInt32(0x2a)))
+        data.append(contentsOf: littleEndian(UInt32(16)))
+        let packed = (sourceVersion.0 << 40) | (sourceVersion.1 << 30) | (sourceVersion.2 << 20)
+        data.append(contentsOf: littleEndian(packed))
+        return data
+    }
+
+    private func fatMachO(sourceVersion: (UInt64, UInt64, UInt64)) -> Data {
+        let slice = thinMachO(sourceVersion: sourceVersion)
+        let offset = 0x100
+        var data = fatTable(is64: false, slices: [(0x0100000c, UInt64(offset), UInt64(slice.count))])
+        data.append(Data(count: offset - data.count))
+        data.append(slice)
+        return data
+    }
+
+    private func fatTable(is64: Bool, slices: [(cpu: UInt32, offset: UInt64, size: UInt64)]) -> Data {
+        var data = Data([0xca, 0xfe, 0xba, is64 ? 0xbf : 0xbe])
+        data.append(contentsOf: bigEndian(UInt32(slices.count)))
+        for slice in slices {
+            data.append(contentsOf: bigEndian(slice.cpu))
+            data.append(contentsOf: bigEndian(UInt32(0)))
+            if is64 {
+                data.append(contentsOf: withUnsafeBytes(of: slice.offset.bigEndian, Array.init))
+                data.append(contentsOf: withUnsafeBytes(of: slice.size.bigEndian, Array.init))
+            } else {
+                data.append(contentsOf: bigEndian(UInt32(slice.offset)))
+                data.append(contentsOf: bigEndian(UInt32(slice.size)))
+            }
+            data.append(contentsOf: bigEndian(UInt32(2)))
+            if is64 { data.append(contentsOf: bigEndian(UInt32(0))) }
+        }
+        return data
+    }
+
+    private func littleEndian(_ value: UInt32) -> [UInt8] {
+        withUnsafeBytes(of: value.littleEndian, Array.init)
+    }
+
+    private func littleEndian(_ value: UInt64) -> [UInt8] {
+        withUnsafeBytes(of: value.littleEndian, Array.init)
+    }
+
+    private func bigEndian(_ value: UInt32) -> [UInt8] {
+        withUnsafeBytes(of: value.bigEndian, Array.init)
     }
 }
 

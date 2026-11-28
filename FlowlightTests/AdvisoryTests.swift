@@ -21,6 +21,106 @@ final class AdvisoryTests: XCTestCase {
         XCTAssertFalse(VersionRangeMatcher.matches(version: "1.5", range: AdvisoryVersionRange(startIncluding: "not-a-version")))
     }
 
+    func testGoModuleAndPEP440VersionsAreUsableWithoutRelaxingFailClosedMatching() {
+        let go = "0.0.0-20240102123456-abcdef123456"
+        XCTAssertTrue(VersionRangeMatcher.isUsable(version: go, scheme: .goModule))
+        XCTAssertFalse(VersionRangeMatcher.isUsable(version: "v1.2.3-01", scheme: .goModule))
+        XCTAssertFalse(VersionRangeMatcher.isUsable(version: "v1.2.3+", scheme: .goModule))
+
+        XCTAssertTrue(VersionRangeMatcher.isUsable(version: "1.0b11", scheme: .pep440))
+        XCTAssertTrue(VersionRangeMatcher.isUsable(version: "24.2", scheme: .pep440))
+        XCTAssertTrue(VersionRangeMatcher.isUsable(version: "1.0.post1", scheme: .pep440))
+        XCTAssertFalse(VersionRangeMatcher.isUsable(version: "1.0\u{25}bad", scheme: .pep440))
+
+        let goMatch = AdvisoryCPEMatch(criteria: "cpe:2.3:a:example:go:*:*:*:*:*:*:*:*",
+                                       targets: [AdvisoryTarget(kind: .package, identifier: "example", packageManager: .goModules)],
+                                       versionEndExcluding: "1.0.0")
+        let goArtifact = AdvisoryArtifact(kind: .package, identifier: "example", name: "example", path: "/tmp/go",
+                                          version: go, versionScheme: .goModule, identityEvidence: .packageManifest,
+                                          versionEvidence: .packageMetadata, source: "Go module", iconPath: nil,
+                                          packageManager: .goModules)
+        XCTAssertTrue(VersionRangeMatcher.matches(goArtifact, match: goMatch))
+
+        let pepMatch = AdvisoryCPEMatch(criteria: "cpe:2.3:a:example:pip:*:*:*:*:*:*:*:*",
+                                        targets: [AdvisoryTarget(kind: .package, identifier: "example", packageManager: .pip)],
+                                        versionStartIncluding: "24.0", versionEndExcluding: "25.0")
+        let pepArtifact = AdvisoryArtifact(kind: .package, identifier: "example", name: "example", path: "/tmp/pip",
+                                           version: "24.2", versionScheme: .pep440, identityEvidence: .packageManifest,
+                                           versionEvidence: .packageMetadata, source: "PyPI package", iconPath: nil,
+                                           packageManager: .pip)
+        XCTAssertTrue(VersionRangeMatcher.matches(pepArtifact, match: pepMatch))
+    }
+
+    func testPythonAdvisoriesHonorPEP440NormalizationAndPostDevelopmentOrdering() {
+        func matches(_ version: String, exact: String = "*", start: String? = nil, end: String? = nil) -> Bool {
+            let match = AdvisoryCPEMatch(criteria: "cpe:2.3:a:example:pip:\(exact):*:*:*:*:*:*:*",
+                                         targets: [AdvisoryTarget(kind: .package, identifier: "example", packageManager: .pip)],
+                                         versionStartIncluding: start, versionEndExcluding: end)
+            let artifact = AdvisoryArtifact(kind: .package, identifier: "example", name: "example", path: "/tmp/pip",
+                                            version: version, versionScheme: .pep440, identityEvidence: .packageManifest,
+                                            versionEvidence: .packageMetadata, source: "PyPI package", iconPath: nil,
+                                            packageManager: .pip)
+            return VersionRangeMatcher.matches(artifact, match: match)
+        }
+
+        XCTAssertTrue(matches("V1.0RC-1", exact: "1.0rc1"))
+        XCTAssertTrue(matches("1.0-1", exact: "1.0.post1"))
+        XCTAssertTrue(matches("1.0_dev", exact: "1.0.dev0"))
+        XCTAssertTrue(matches("1.0.dev1", end: "1.0a1"))
+        XCTAssertTrue(matches("1.0.post1.dev1", start: "1.0", end: "1.0.post1"))
+        XCTAssertTrue(matches("1.0.post2.dev1", start: "1.0.post1", end: "1.0.post2"))
+        XCTAssertTrue(matches("1.2+vendor.2", exact: "1.2"))
+        XCTAssertTrue(matches("1.2+Vendor-01", exact: "1.2+vendor.1"))
+        XCTAssertFalse(matches("1.2+vendor.2", exact: "1.2+vendor.1"))
+        XCTAssertFalse(matches("1.2", exact: "1.2+vendor.1"))
+        XCTAssertFalse(matches("1.0-1", exact: "1.0.1"))
+        XCTAssertFalse(matches("1.0_1", end: "2.0"))
+        XCTAssertFalse(matches("1.0.post1", end: "1.0.post1"))
+        XCTAssertFalse(matches("1.0", start: "18446744073709551616!1.0"))
+    }
+
+    func testGoAdvisoriesOrderNumericPrereleaseTags() {
+        func matches(_ version: String, start: String, end: String) -> Bool {
+            let match = AdvisoryCPEMatch(criteria: "cpe:2.3:a:example:go:*:*:*:*:*:*:*:*",
+                                         targets: [AdvisoryTarget(kind: .package, identifier: "example", packageManager: .goModules)],
+                                         versionStartIncluding: start, versionEndExcluding: end)
+            let artifact = AdvisoryArtifact(kind: .package, identifier: "example", name: "example", path: "/tmp/go",
+                                            version: version, versionScheme: .goModule, identityEvidence: .packageManifest,
+                                            versionEvidence: .packageMetadata, source: "Go module", iconPath: nil,
+                                            packageManager: .goModules)
+            return VersionRangeMatcher.matches(artifact, match: match)
+        }
+
+        XCTAssertTrue(matches("v1.2.3-2", start: "v1.2.3-1", end: "v1.2.3-10"))
+        XCTAssertTrue(matches("v1.2.3-10", start: "v1.2.3-2", end: "v1.2.3"))
+        XCTAssertFalse(matches("v1.2.3-10", start: "v1.2.3-2", end: "v1.2.3-10"))
+        XCTAssertFalse(matches("v1.2.3", start: "v1.2.3-10", end: "v1.2.3"))
+        XCTAssertTrue(matches("v1.2.3-100000000000000000000", start: "v1.2.3-99999999999999999999", end: "v1.2.3-alpha"))
+        XCTAssertFalse(matches("v1.2.3-100000000000000000000", start: "v1.2.3-1", end: "v1.2.3-99999999999999999999"))
+    }
+
+    func testUnavailableArtifactVersionDoesNotMatchNegatedCriteria() {
+        let target = AdvisoryTarget(kind: .executable, identifier: "example")
+        let match = AdvisoryCPEMatch(criteria: "cpe:2.3:a:example:tool:*:*:*:*:*:*:*:*",
+                                     targets: [target], versionEndExcluding: "2.0")
+        let advisory = SecurityAdvisory(id: "CVE-2099-9999", configurations: [
+            AdvisoryConfiguration(nodes: [AdvisoryNode(negate: true, matches: [match])])
+        ])
+        let artifact = AdvisoryArtifact(kind: .executable, identifier: "example", name: "example", path: "/tmp/tool",
+                                        version: nil, versionScheme: .opaque, identityEvidence: .executablePath,
+                                        versionEvidence: nil, source: "Executable path", iconPath: nil)
+        XCTAssertFalse(advisory.matches(artifact))
+    }
+
+    func testRecordedButUnsupportedVersionRemainsUnmatchable() {
+        let artifact = AdvisoryArtifact(kind: .package, identifier: "example", name: "example",
+                                        path: "/tmp/example", version: "1.0b11", versionScheme: .semver,
+                                        identityEvidence: .packageManifest, versionEvidence: .packageMetadata,
+                                        source: "PyPI package", iconPath: nil, packageManager: .pip)
+        XCTAssertTrue(artifact.hasRecordedVersionEvidence)
+        XCTAssertFalse(artifact.hasVersionEvidence)
+    }
+
     func testAdvisoryRequiresExplicitBundleIdentityAndVersionEvidence() {
         let match = AdvisoryCPEMatch(criteria: "cpe:2.3:a:example:sample:*:*:*:*:*:macos:*:*",
                                       bundleIDs: ["com.example.Sample"],

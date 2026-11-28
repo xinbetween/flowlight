@@ -91,7 +91,17 @@ struct RuleEditor: View {
                 }
 
                 Section {
-                    DisclosureGroup(isExpanded: $showAdvanced) {
+                    FullWidthDisclosureHeader(isExpanded: $showAdvanced) {
+                        // The summary a closed row earns: what is set in there, rather than only the offer to look.
+                        HStack(spacing: 6) {
+                            Text(L("One URL rather than the whole host"))
+                            if !advancedSummary.isEmpty {
+                                Text(advancedSummary).font(.caption.monospaced()).foregroundStyle(.secondary)
+                                    .lineLimit(1).truncationMode(.middle)
+                            }
+                        }
+                    }
+                    if showAdvanced {
                         TextField(L("Path"), text: $rule.path, prompt: Text(L("Any path — or /v1/*")))
                         Picker(L("Method"), selection: $rule.method) {
                             ForEach(MockRule.methods, id: \.self) { method in
@@ -107,15 +117,6 @@ struct RuleEditor: View {
                         }
                         Text(L("A path can only be matched where the request can be read, which is HTTPS inspection. That is also what makes this the friendlier refusal: the agent gets a status it can read instead of a connection that died without saying why."))
                             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    } label: {
-                        // The summary a closed row earns: what is set in there, rather than only the offer to look.
-                        HStack(spacing: 6) {
-                            Text(L("One URL rather than the whole host"))
-                            if !advancedSummary.isEmpty {
-                                Text(advancedSummary).font(.caption.monospaced()).foregroundStyle(.secondary)
-                                    .lineLimit(1).truncationMode(.middle)
-                            }
-                        }
                     }
                 }
 

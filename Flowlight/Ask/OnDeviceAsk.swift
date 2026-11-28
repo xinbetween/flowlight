@@ -18,6 +18,7 @@ enum OnDeviceAsk {
     enum Readiness: Equatable {
         case ready
         case needsNewerMacOS
+        case deviceNotEligible
         case notEnabled(String)
 
         var explanation: String? {
@@ -25,6 +26,8 @@ enum OnDeviceAsk {
             case .ready: return nil
             case .needsNewerMacOS:
                 return L("The on-device model needs macOS 26 or later. Everything else here still works: a local server like Ollama sends nothing off the Mac either.")
+            case .deviceNotEligible:
+                return L("This Mac can't run the on-device model. A local server like Ollama sends nothing off the Mac either.")
             case .notEnabled(let reason): return reason
             }
         }
@@ -41,7 +44,7 @@ enum OnDeviceAsk {
         case .unavailable(.modelNotReady):
             return .notEnabled(L("macOS is still downloading the on-device model. It'll be ready shortly."))
         case .unavailable(.deviceNotEligible):
-            return .notEnabled(L("This Mac can't run the on-device model. A local server like Ollama sends nothing off the Mac either."))
+            return .deviceNotEligible
         case .unavailable:
             return .notEnabled(L("The on-device model isn't available right now."))
         }

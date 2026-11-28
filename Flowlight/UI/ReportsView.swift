@@ -500,26 +500,13 @@ struct ReportsView: View {
         let hasDetails = localRiskScopeSupported && LocalRiskSettings.isActive &&
             (localRiskCounts.totalPotentialHarm > 0 || localRiskCounts.unassessed > 0)
         HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle").foregroundStyle(FL.warning)
-            Text(L("Potential harm")).font(.callout.bold())
-            if !localRiskScopeSupported {
-                Text(L("Unavailable for this scope"))
-                    .font(.caption).foregroundStyle(.secondary)
-                    .help(L("Local risk assessments cannot be matched to owner, IP address, protocol, or way-out filters. No finding is being claimed for this scope."))
-            } else if LocalRiskSettings.isActive {
-                Text(localRiskCounts.totalPotentialHarm > 0
-                     ? L("%lld medium/high", localRiskCounts.totalPotentialHarm)
-                     : L("No medium/high findings"))
-                    .font(.caption).foregroundStyle(.secondary)
-            } else {
-                Text(L("Off · retained findings hidden")).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 4)
             if hasDetails {
-                Button(showRiskDetails ? L("Hide details") : L("Details")) {
-                    showRiskDetails.toggle()
+                FullWidthDisclosureHeader(isExpanded: $showRiskDetails) {
+                    HStack(spacing: 10) { localRiskHeading }
                 }
-                .buttonStyle(.link)
+            } else {
+                localRiskHeading
+                Spacer(minLength: 4)
             }
             Toggle(isOn: Binding(get: { LocalRiskSettings.isActive }, set: { monitor.setLocalRiskEnabled($0) })) {
                 Text(L("Local risk analysis"))
@@ -554,6 +541,24 @@ struct ReportsView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private var localRiskHeading: some View {
+        Image(systemName: "exclamationmark.triangle").foregroundStyle(FL.warning)
+        Text(L("Potential harm")).font(.callout.bold())
+        if !localRiskScopeSupported {
+            Text(L("Unavailable for this scope"))
+                .font(.caption).foregroundStyle(.secondary)
+                .help(L("Local risk assessments cannot be matched to owner, IP address, protocol, or way-out filters. No finding is being claimed for this scope."))
+        } else if LocalRiskSettings.isActive {
+            Text(localRiskCounts.totalPotentialHarm > 0
+                 ? L("%lld medium/high", localRiskCounts.totalPotentialHarm)
+                 : L("No medium/high findings"))
+                .font(.caption).foregroundStyle(.secondary)
+        } else {
+            Text(L("Off · retained findings hidden")).font(.caption).foregroundStyle(.secondary)
         }
     }
 

@@ -78,6 +78,8 @@ enum AdvisoryPackageManager: String, Codable, CaseIterable, Hashable, Sendable {
 enum AdvisoryVersionScheme: String, Codable, Hashable, Sendable {
     case numeric
     case semver
+    case pep440
+    case goModule
     case opaque
 }
 
@@ -93,6 +95,9 @@ enum AdvisoryVersionEvidence: String, Codable, Hashable, Sendable {
     case homebrewInstallReceipt
     case packageJSON
     case packageMetadata
+    case executableMetadata
+    /// Linker source/build metadata can be shown but is not evidence of an upstream product release.
+    case machOSourceVersion
     case executableVersionProbe
 }
 
@@ -147,8 +152,16 @@ struct AdvisoryArtifact: Equatable, Hashable, Sendable, Identifiable {
         "\(kind.rawValue):\(identifier.lowercased()):\(canonicalPath(path))"
     }
 
+    /// The inventory found a version and can explain where it came from, even if the matcher cannot compare its syntax.
+    var hasRecordedVersionEvidence: Bool {
+        guard let version else { return false }
+        return !version.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && versionEvidence != nil
+    }
+
+    /// Only versions accepted by the scheme-specific matcher may produce advisory matches.
     var hasVersionEvidence: Bool {
-        version != nil && versionEvidence != nil && VersionRangeMatcher.isUsable(version: version, scheme: versionScheme)
+        hasRecordedVersionEvidence && versionEvidence != .machOSourceVersion
+            && VersionRangeMatcher.isUsable(version: version, scheme: versionScheme)
     }
 
     private func canonicalPath(_ path: String) -> String {
@@ -172,6 +185,7 @@ struct AdvisoryInventoryRoot: Equatable, Hashable, Sendable, Identifiable {
 enum AdvisoryInventoryPreferences {
     static let selectedProjectRootsKey = "advisoryInventory.selectedProjectRoots"
     static let selectedProjectBookmarksKey = "advisoryInventory.selectedProjectBookmarks"
+    static let homeScanEnabledKey = "advisoryInventory.homeScanEnabled"
 
     static var selectedProjectRoots: [AdvisoryInventoryRoot] {
         let paths = UserDefaults.standard.stringArray(forKey: selectedProjectRootsKey) ?? []
@@ -181,12 +195,21 @@ enum AdvisoryInventoryPreferences {
         }
     }
 
+    static var homeScanEnabled: Bool {
+        guard UserDefaults.standard.object(forKey: homeScanEnabledKey) != nil else { return true }
+        return UserDefaults.standard.bool(forKey: homeScanEnabledKey)
+    }
+
     static func saveSelectedProjectRoots(_ roots: [AdvisoryInventoryRoot]) {
         UserDefaults.standard.set(roots.map(\.path), forKey: selectedProjectRootsKey)
         let bookmarks = Dictionary(uniqueKeysWithValues: roots.compactMap { root in
             root.bookmarkData.map { (root.path, $0) }
         })
         UserDefaults.standard.set(bookmarks, forKey: selectedProjectBookmarksKey)
+    }
+
+    static func setHomeScanEnabled(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: homeScanEnabledKey)
     }
 }
 
@@ -212,12 +235,20 @@ struct AdvisoryInventoryScanner {
         var executableRoots: [String]
         var homebrewPrefixes: [String]
         var selectedProjectRoots: [AdvisoryInventoryRoot]
+        /// A non-bookmarked root used only by the automatic home scan. Tests inject a temporary root here.
+        var homePackageRoot: String? = nil
         var maximumProjectDepth: Int = 4
         var maximumProjectVisits: Int = 4_000
         var maximumHomebrewDepth: Int = 6
         var maximumHomebrewVisits: Int = 20_000
+        var maximumHomeDepth: Int = 6
+        var maximumHomeVisits: Int = 20_000
         var maximumPackageManifestBytes: Int = 1_048_576
+        var maximumHomePackageManifestBytes: Int = 1_048_576
         var maximumPackageArtifacts: Int = 2_000
+        var maximumHomePackageArtifacts: Int = 2_000
+        var maximumProjectEntries: Int = 50_000
+        var maximumHomeEntries: Int = 200_000
 
         static var `default`: Configuration {
             let home = NSHomeDirectory()
@@ -225,7 +256,8 @@ struct AdvisoryInventoryScanner {
                 applicationRoots: ["/Applications", "/System/Applications", home + "/Applications"],
                 executableRoots: ["/usr/bin", "/usr/local/bin", "/usr/local/sbin", "/opt/homebrew/bin", "/opt/homebrew/sbin"],
                 homebrewPrefixes: ["/opt/homebrew", "/usr/local"],
-                selectedProjectRoots: AdvisoryInventoryPreferences.selectedProjectRoots
+                selectedProjectRoots: AdvisoryInventoryPreferences.selectedProjectRoots,
+                homePackageRoot: AdvisoryInventoryPreferences.homeScanEnabled ? home : nil
             )
         }
     }
@@ -247,19 +279,21 @@ struct AdvisoryInventoryScanner {
         sources.append(appResult.source)
 
         let executableResult = scanExecutables()
-        artifacts.append(contentsOf: executableResult.artifacts)
-        sources.append(executableResult.source)
-
         let homebrewResult = scanHomebrew()
-        artifacts.append(contentsOf: homebrewResult.artifacts)
-        sources.append(homebrewResult.source)
+        let installed = executableResult.artifacts + homebrewResult.artifacts
+        artifacts.append(contentsOf: installed)
+        let installedDetails = [executableResult.detail, homebrewResult.detail].compactMap { $0 }
+        sources.append(AdvisoryInventorySourceResult(
+            source: L("Packages & Executables"), discovered: installed.count,
+            complete: installedDetails.isEmpty, detail: installedDetails.isEmpty ? nil : installedDetails.joined(separator: " ")
+        ))
 
         let packageResult = scanNodePackages()
         artifacts.append(contentsOf: packageResult.artifacts)
         sources.append(contentsOf: packageResult.sources)
 
         var unique: [String: AdvisoryArtifact] = [:]
-        for artifact in artifacts {
+        for artifact in artifacts where unique[artifact.id] == nil {
             unique[artifact.id] = artifact
         }
 
@@ -303,7 +337,7 @@ struct AdvisoryInventoryScanner {
             source: L("Applications"), discovered: artifacts.count, complete: complete, detail: detail))
     }
 
-    private func scanExecutables() -> (artifacts: [AdvisoryArtifact], source: AdvisoryInventorySourceResult) {
+    private func scanExecutables() -> (artifacts: [AdvisoryArtifact], detail: String?) {
         var artifacts: [AdvisoryArtifact] = []
         var complete = true
         for root in configuration.executableRoots {
@@ -322,15 +356,17 @@ struct AdvisoryInventoryScanner {
                     let canonical = url.resolvingSymlinksInPath().standardizedFileURL.path
                     let alias = url.lastPathComponent
                     guard !alias.isEmpty else { continue }
+                    let metadataURL = URL(fileURLWithPath: canonical)
+                    let metadataVersion = ExecutableVersionProbe.metadataVersion(at: metadataURL)
                     artifacts.append(AdvisoryArtifact(
                         kind: .executable,
                         identifier: alias,
                         name: alias,
                         path: canonical,
-                        version: nil,
+                        version: metadataVersion?.version,
                         versionScheme: .opaque,
                         identityEvidence: .executablePath,
-                        versionEvidence: nil,
+                        versionEvidence: metadataVersion?.evidence,
                         source: L("Executable path"),
                         iconPath: canonical,
                         executionAlias: alias
@@ -340,12 +376,10 @@ struct AdvisoryInventoryScanner {
                 complete = false
             }
         }
-        return (artifacts, AdvisoryInventorySourceResult(
-            source: L("Executables"), discovered: artifacts.count, complete: complete,
-            detail: complete ? nil : L("One or more executable locations could not be read.")))
+        return (artifacts, complete ? nil : L("One or more executable locations could not be read."))
     }
 
-    private func scanHomebrew() -> (artifacts: [AdvisoryArtifact], source: AdvisoryInventorySourceResult) {
+    private func scanHomebrew() -> (artifacts: [AdvisoryArtifact], detail: String?) {
         var artifacts: [AdvisoryArtifact] = []
         var complete = true
         var seen = Set<String>()
@@ -442,9 +476,7 @@ struct AdvisoryInventoryScanner {
                 ))
             }
         }
-        return (artifacts, AdvisoryInventorySourceResult(
-            source: L("Homebrew"), discovered: artifacts.count, complete: complete,
-            detail: complete ? nil : L("One or more Homebrew locations could not be read.")))
+        return (artifacts, complete ? nil : L("One or more Homebrew locations could not be read."))
     }
 
     private func readHomebrewReceipt(_ url: URL) -> HomebrewReceiptReadResult {
@@ -460,7 +492,8 @@ struct AdvisoryInventoryScanner {
     private func scanNodePackages() -> (artifacts: [AdvisoryArtifact], sources: [AdvisoryInventorySourceResult]) {
         var artifacts: [AdvisoryArtifact] = []
         var sources: [AdvisoryInventorySourceResult] = []
-        for root in configuration.selectedProjectRoots {
+        let homeRootID = configuration.homePackageRoot.map { URL(fileURLWithPath: $0).standardizedFileURL.path }
+        for root in configuration.selectedProjectRoots where root.id != homeRootID {
             let result = scanNodePackages(in: root)
             artifacts.append(contentsOf: result.artifacts)
             sources.append(result.source)
@@ -470,7 +503,25 @@ struct AdvisoryInventoryScanner {
                 source: L("Selected project folders"), discovered: 0, complete: true,
                 detail: L("Add a project folder in Settings to inspect node_modules.")))
         }
+        if let homePackageRoot = configuration.homePackageRoot {
+            let result = scanHomePackages(at: URL(fileURLWithPath: homePackageRoot).standardizedFileURL)
+            artifacts.append(contentsOf: result.artifacts)
+            sources.append(result.source)
+        } else {
+            sources.append(AdvisoryInventorySourceResult(
+                source: L("Home folder"), discovered: 0, complete: true,
+                detail: L("Home folder package scanning is paused.")))
+        }
         return (artifacts, sources)
+    }
+
+    private struct PackageScanPolicy {
+        var maximumDepth: Int
+        var maximumVisits: Int
+        var maximumEntries: Int
+        var maximumArtifacts: Int
+        var maximumManifestBytes: Int
+        var skippedDirectories: Set<String>
     }
 
     private func scanNodePackages(in root: AdvisoryInventoryRoot) -> (artifacts: [AdvisoryArtifact], source: AdvisoryInventorySourceResult) {
@@ -492,90 +543,181 @@ struct AdvisoryInventoryScanner {
             rootURL = URL(fileURLWithPath: root.path).standardizedFileURL
         }
         defer { if hasSecurityScope { rootURL.stopAccessingSecurityScopedResource() } }
-        guard fileManager.fileExists(atPath: rootURL.path) else {
+        let policy = PackageScanPolicy(
+            maximumDepth: configuration.maximumProjectDepth,
+            maximumVisits: configuration.maximumProjectVisits,
+            maximumEntries: configuration.maximumProjectEntries,
+            maximumArtifacts: configuration.maximumPackageArtifacts,
+            maximumManifestBytes: configuration.maximumPackageManifestBytes,
+            skippedDirectories: projectSkippedDirectories
+        )
+        guard let result = scanPackageTree(at: rootURL, policy: policy) else {
             return ([], AdvisoryInventorySourceResult(source: root.path, discovered: 0, complete: false,
                                                        detail: L("The selected folder is unavailable.")))
         }
-        var artifacts: [AdvisoryArtifact] = []
-        var complete = true
-        var visits = 0
-        guard let enumerator = fileManager.enumerator(
-            at: rootURL,
-            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
-            options: [.skipsHiddenFiles],
-            errorHandler: { _, _ in complete = false; return true }
-        ) else {
-            return ([], AdvisoryInventorySourceResult(source: root.path, discovered: 0, complete: false,
-                                                       detail: L("The selected folder could not be read.")))
-        }
-        for case let url as URL in enumerator {
-            visits += 1
-            if visits > configuration.maximumProjectVisits {
-                complete = false
-                break
-            }
-            guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
-                  values.isSymbolicLink != true else {
-                enumerator.skipDescendants()
-                continue
-            }
-            let relativeDepth = url.pathComponents.count - rootURL.pathComponents.count
-            if values.isDirectory == true {
-                if relativeDepth >= configuration.maximumProjectDepth {
-                    complete = false
-                    enumerator.skipDescendants()
-                } else if shouldSkipProjectDirectory(url.lastPathComponent) {
-                    enumerator.skipDescendants()
-                }
-                continue
-            }
-            if url.lastPathComponent == "package.json", url.pathComponents.contains("node_modules") {
-                guard artifacts.count < max(0, configuration.maximumPackageArtifacts) else {
-                    complete = false
-                    break
-                }
-                guard let package = readPackage(url) else {
-                    complete = false
-                    continue
-                }
-                guard let name = package.name, let version = package.version else { continue }
-                let canonical = url.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.path
-                artifacts.append(AdvisoryArtifact(
-                    kind: .nodePackage,
-                    identifier: name,
-                    name: name,
-                    path: canonical,
-                    version: version,
-                    versionScheme: .semver,
-                    identityEvidence: .packageManifest,
-                    versionEvidence: .packageJSON,
-                    source: L("package.json"),
-                    iconPath: nil,
-                    packageManager: .npm
-                ))
-                if artifacts.count >= max(0, configuration.maximumPackageArtifacts) {
-                    complete = false
-                    break
-                }
-                continue
-            }
-            guard let manager = packageManager(for: url.lastPathComponent) else { continue }
-            let discovered = readPackageArtifacts(url, manager: manager)
-            if discovered.isEmpty, manager != .pip {
-                complete = false
-            }
-            artifacts.append(contentsOf: discovered.prefix(max(0, configuration.maximumPackageArtifacts - artifacts.count)))
-            if artifacts.count >= configuration.maximumPackageArtifacts {
-                complete = false
-                break
-            }
-        }
-        let sourceComplete = complete && !bookmarkWasStale
-        return (artifacts, AdvisoryInventorySourceResult(
-            source: root.path, discovered: artifacts.count, complete: sourceComplete,
+        let sourceComplete = result.complete && !bookmarkWasStale
+        return (result.artifacts, AdvisoryInventorySourceResult(
+            source: root.path, discovered: result.artifacts.count, complete: sourceComplete,
             detail: sourceComplete ? nil : (bookmarkWasStale
                 ? L("The selected folder permission is stale; refresh it in Settings.")
                 : L("The selected folder was only partially inspected."))))
+    }
+
+    private func scanHomePackages(at rootURL: URL) -> (artifacts: [AdvisoryArtifact], source: AdvisoryInventorySourceResult) {
+        let policy = PackageScanPolicy(
+            maximumDepth: configuration.maximumHomeDepth,
+            maximumVisits: configuration.maximumHomeVisits,
+            maximumEntries: configuration.maximumHomeEntries,
+            maximumArtifacts: configuration.maximumHomePackageArtifacts,
+            maximumManifestBytes: configuration.maximumHomePackageManifestBytes,
+            skippedDirectories: homeSkippedDirectories
+        )
+        guard let result = scanPackageTree(at: rootURL, policy: policy) else {
+            return ([], AdvisoryInventorySourceResult(source: L("Home folder"), discovered: 0, complete: false,
+                                                       detail: L("The home folder could not be read.")))
+        }
+        let detail: String?
+        if result.complete {
+            detail = L("Recursive home scan · depth %lld · up to %lld entries · system, generated, hidden, and cache folders skipped.",
+                       max(0, policy.maximumDepth), max(0, policy.maximumEntries))
+        } else {
+            detail = L("The home folder was only partially inspected. The scan checks up to %lld entries at depth %lld and skips system, generated, hidden, and cache folders.",
+                       max(0, policy.maximumEntries), max(0, policy.maximumDepth))
+        }
+        return (result.artifacts, AdvisoryInventorySourceResult(
+            source: L("Home folder"), discovered: result.artifacts.count, complete: result.complete, detail: detail))
+    }
+
+    private static let packageDirectoryFlags = O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW
+    private static let packageManifestFlags = O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW
+
+    private func scanPackageTree(at rootURL: URL, policy: PackageScanPolicy) -> (artifacts: [AdvisoryArtifact], complete: Bool)? {
+        let root = open(rootURL.path, Self.packageDirectoryFlags)
+        guard root >= 0 else { return nil }
+        var artifacts: [AdvisoryArtifact] = []
+        var complete = true
+        var stopped = false
+        var visits = 0
+        var entries = 0
+        let maximumDepth = max(0, policy.maximumDepth)
+        let maximumVisits = max(0, policy.maximumVisits)
+        let maximumEntries = max(0, policy.maximumEntries)
+        let maximumArtifacts = max(0, policy.maximumArtifacts)
+
+        // Each stream owns its descriptor. Only names of eligible child directories are buffered,
+        // within the shared entry budget, so manifests here get priority over descendants.
+        func walk(_ descriptor: Int32, url: URL, depth: Int, inNodeModules: Bool) {
+            guard visits < maximumVisits, artifacts.count < maximumArtifacts, !Task.isCancelled else {
+                close(descriptor)
+                complete = false
+                return
+            }
+            visits += 1
+            guard let stream = fdopendir(descriptor) else {
+                close(descriptor)
+                complete = false
+                return
+            }
+            defer { closedir(stream) }
+            var childDirectories: [String] = []
+            while !stopped {
+                if Task.isCancelled {
+                    stopped = true
+                    complete = false
+                    return
+                }
+                errno = 0
+                guard let entry = readdir(stream) else {
+                    if errno != 0 { complete = false }
+                    break
+                }
+                let capacity = Int(entry.pointee.d_namlen) + 1
+                let name = withUnsafePointer(to: &entry.pointee.d_name) {
+                    $0.withMemoryRebound(to: CChar.self, capacity: capacity) { String(validatingUTF8: $0) }
+                }
+                if name == "." || name == ".." { continue }
+                // A single lookahead distinguishes an exhausted budget from an exact fit at EOF.
+                guard entries < maximumEntries else {
+                    stopped = true
+                    complete = false
+                    return
+                }
+                entries += 1
+                guard let name else { complete = false; continue }
+                guard !name.hasPrefix("."), !policy.skippedDirectories.contains(name) else { continue }
+
+                let manager: AdvisoryPackageManager? = inNodeModules && name == "package.json" ? .npm : packageManager(for: name)
+                let type = Int32(entry.pointee.d_type)
+                guard manager != nil || type == DT_DIR || type == DT_UNKNOWN else { continue }
+                var info = stat()
+                guard fstatat(descriptor, name, &info, AT_SYMLINK_NOFOLLOW) == 0 else {
+                    complete = false
+                    continue
+                }
+                if (info.st_mode & S_IFMT) == S_IFDIR {
+                    guard depth < maximumDepth, visits < maximumVisits else { complete = false; continue }
+                    childDirectories.append(name)
+                    continue
+                }
+                guard let manager else { continue }
+                guard (info.st_mode & S_IFMT) == S_IFREG,
+                      let data = readPackageManifest(in: descriptor, name: name, maximumBytes: policy.maximumManifestBytes) else {
+                    complete = false
+                    continue
+                }
+                if manager == .npm {
+                    guard let (name, version) = readNodePackage(data) else { complete = false; continue }
+                    artifacts.append(AdvisoryArtifact(
+                        kind: .nodePackage, identifier: name, name: name, path: url.path,
+                        version: version, versionScheme: .semver, identityEvidence: .packageManifest,
+                        versionEvidence: .packageJSON, source: L("package.json"), iconPath: nil, packageManager: .npm
+                    ))
+                } else {
+                    let remaining = maximumArtifacts - artifacts.count
+                    let manifest = url.appendingPathComponent(name, isDirectory: false)
+                    guard let discovered = readPackageArtifacts(data, at: manifest, manager: manager, limit: remaining),
+                          !discovered.isEmpty || manager == .pip else {
+                        complete = false
+                        continue
+                    }
+                    artifacts.append(contentsOf: discovered)
+                }
+                if artifacts.count >= maximumArtifacts {
+                    stopped = true
+                    complete = false
+                    return
+                }
+            }
+            for name in childDirectories {
+                guard !stopped, !Task.isCancelled, visits < maximumVisits else {
+                    complete = false
+                    return
+                }
+                let child = openat(descriptor, name, Self.packageDirectoryFlags)
+                guard child >= 0 else { complete = false; continue }
+                walk(child, url: url.appendingPathComponent(name, isDirectory: true),
+                     depth: depth + 1, inNodeModules: inNodeModules || name == "node_modules")
+            }
+        }
+
+        walk(root, url: rootURL, depth: 0, inNodeModules: rootURL.pathComponents.contains("node_modules"))
+        return (artifacts, complete)
+    }
+
+    private func readPackageManifest(in parent: Int32, name: String, maximumBytes: Int) -> Data? {
+        guard maximumBytes >= 0, maximumBytes < Int.max else { return nil }
+        let descriptor = openat(parent, name, Self.packageManifestFlags)
+        guard descriptor >= 0 else { return nil }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        var info = stat()
+        guard fstat(descriptor, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG,
+              info.st_size <= maximumBytes else { return nil }
+        do {
+            let data = try handle.read(upToCount: maximumBytes + 1) ?? Data()
+            return data.count <= maximumBytes ? data : nil
+        } catch {
+            return nil
+        }
     }
 
     private func packageManager(for filename: String) -> AdvisoryPackageManager? {
@@ -594,18 +736,15 @@ struct AdvisoryInventoryScanner {
         }
     }
 
-    private func readPackageArtifacts(_ url: URL, manager: AdvisoryPackageManager) -> [AdvisoryArtifact] {
-        let text = readBoundedText(url) ?? ""
+    private func readPackageArtifacts(_ data: Data, at url: URL, manager: AdvisoryPackageManager, limit: Int) -> [AdvisoryArtifact]? {
+        guard let text = String(data: data, encoding: .utf8) else { return nil }
         var entries: [(String, String)] = []
         switch manager {
         case .pip:
             let pattern = #"(?m)^\s*([A-Za-z0-9_.-]+)\s*==\s*([A-Za-z0-9.+!_-]+)"#
             entries = regexPairs(text, pattern: pattern)
             if entries.isEmpty, url.lastPathComponent == "pyproject.toml" {
-                if let name = regexPairs(text, pattern: #"(?m)^name\s*=\s*[\"]([^\"]+)[\"]"#).first?.0,
-                   let version = regexPairs(text, pattern: #"(?m)^version\s*=\s*[\"]([^\"]+)[\"]"#).first?.1 {
-                    entries = [(name, version)]
-                }
+                entries = pyProjectPair(text).map { [$0] } ?? []
             }
         case .cargo:
             entries = regexPairs(text, pattern: #"(?ms)^name\s*=\s*[\"]([^\"]+)[\"]\s*^version\s*=\s*[\"]([^\"]+)[\"]"#)
@@ -614,29 +753,49 @@ struct AdvisoryInventoryScanner {
         case .bundler:
             entries = regexPairs(text, pattern: #"(?m)^\s{4}([A-Za-z0-9_.-]+) \(([^)]+)\)"#)
         case .composer:
-            entries = jsonPackagePairs(url, keys: ["packages", "packages-dev"])
+            entries = jsonPackagePairs(data, keys: ["packages", "packages-dev"])
         case .maven:
             let groups = regexTriples(text, pattern: #"(?ms)<groupId>\s*([^<]+)\s*</groupId>.*?<artifactId>\s*([^<]+)\s*</artifactId>.*?<version>\s*([^<]+)\s*</version>"#)
             entries = groups.map { ("\($0.0):\($0.1)", $0.2) }
         case .gradle:
             entries = regexTriples(text, pattern: #"(?m)^([^:]+):([^:]+):([^=\s]+)="#).map { ("\($0.0):\($0.1)", $0.2) }
         case .nuget:
-            entries = jsonPackagePairs(url, keys: ["dependencies"])
+            entries = jsonPackagePairs(data, keys: ["dependencies"])
         case .swiftPM:
-            entries = jsonPackagePairs(url, keys: ["pins"])
+            entries = jsonPackagePairs(data, keys: ["pins"])
         case .mix:
             entries = regexPairs(text, pattern: #"(?m)[\"]([A-Za-z0-9_-]+)[\"]\s*:\s*\{[^}]*?[\"]([0-9]+(?:\.[0-9]+){1,3})[\"]"#)
         case .npm, .homebrewFormula, .homebrewCask:
             break
         }
-        let scheme: AdvisoryVersionScheme = [.npm, .pip, .cargo, .bundler, .composer, .maven, .gradle, .nuget, .swiftPM, .mix].contains(manager) ? .semver : .opaque
-        let canonical = url.resolvingSymlinksInPath().standardizedFileURL.path
-        return entries.prefix(configuration.maximumPackageArtifacts).map { name, version in
-            AdvisoryArtifact(kind: .package, identifier: name, name: name, path: canonical,
+        let scheme: AdvisoryVersionScheme
+        switch manager {
+        case .pip: scheme = .pep440
+        case .goModules: scheme = .goModule
+        case .npm, .cargo, .bundler, .composer, .maven, .gradle, .nuget, .swiftPM, .mix: scheme = .semver
+        case .homebrewFormula, .homebrewCask: scheme = .opaque
+        }
+        return entries.prefix(limit).map { name, version in
+            AdvisoryArtifact(kind: .package, identifier: name, name: name, path: url.path,
                              version: version, versionScheme: scheme, identityEvidence: .packageManifest,
                              versionEvidence: .packageMetadata, source: manager.title, iconPath: nil,
                              packageManager: manager)
         }
+    }
+
+    private func pyProjectPair(_ text: String) -> (String, String)? {
+        let sectionPattern = #"(?ms)^\[project\]\s*(.*?)(?=^\[[^\]]+\]\s*$|\z)"#
+        guard let section = firstCapture(text, pattern: sectionPattern) else { return nil }
+        guard let name = firstCapture(section, pattern: #"(?m)^\s*name\s*=\s*[\"']([^\"']+)[\"']\s*$"#),
+              let version = firstCapture(section, pattern: #"(?m)^\s*version\s*=\s*[\"']([^\"']+)[\"']\s*$"#) else { return nil }
+        return (name.trimmingCharacters(in: .whitespacesAndNewlines), version.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private func firstCapture(_ text: String, pattern: String) -> String? {
+        guard let expression = try? NSRegularExpression(pattern: pattern, options: []),
+              let match = expression.firstMatch(in: text, range: NSRange(text.startIndex..<text.endIndex, in: text)),
+              let range = Range(match.range(at: 1), in: text) else { return nil }
+        return String(text[range])
     }
 
     private func regexPairs(_ text: String, pattern: String) -> [(String, String)] {
@@ -665,8 +824,8 @@ struct AdvisoryInventoryScanner {
         }
     }
 
-    private func jsonPackagePairs(_ url: URL, keys: [String]) -> [(String, String)] {
-        guard case let .dictionary(root) = readBoundedJSONDictionary(url) else { return [] }
+    private func jsonPackagePairs(_ data: Data, keys: [String]) -> [(String, String)] {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
         var pairs: [(String, String)] = []
         func collect(_ value: Any) {
             if let array = value as? [[String: Any]] {
@@ -692,22 +851,8 @@ struct AdvisoryInventoryScanner {
         return pairs
     }
 
-    private func readBoundedText(_ url: URL) -> String? {
-        let limit = configuration.maximumPackageManifestBytes
-        let descriptor = Darwin.open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
-        guard descriptor >= 0 else { return nil }
-        var fileStatus = stat()
-        guard Darwin.fstat(descriptor, &fileStatus) == 0, (fileStatus.st_mode & S_IFMT) == S_IFREG else {
-            _ = Darwin.close(descriptor)
-            return nil
-        }
-        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
-        guard let data = try? handle.read(upToCount: limit + 1), data.count <= limit else { return nil }
-        return String(data: data, encoding: .utf8)
-    }
-
-    private func readBoundedJSONDictionary(_ url: URL) -> BoundedJSONReadResult {
-        let limit = configuration.maximumPackageManifestBytes
+    private func readBoundedJSONDictionary(_ url: URL, maximumBytes: Int? = nil) -> BoundedJSONReadResult {
+        let limit = maximumBytes ?? configuration.maximumPackageManifestBytes
         guard limit >= 0 else { return .unavailable }
 
         // Open without following symlinks, then validate the descriptor itself. Checking the URL before
@@ -736,16 +881,21 @@ struct AdvisoryInventoryScanner {
         }
     }
 
-    private func readPackage(_ url: URL) -> (name: String?, version: String?)? {
-        guard case let .dictionary(dictionary) = readBoundedJSONDictionary(url) else { return nil }
-        let name = (dictionary["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let version = (dictionary["version"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let name, !name.isEmpty else { return nil }
-        return (name, version?.isEmpty == true ? nil : version)
+    private func readNodePackage(_ data: Data) -> (name: String, version: String)? {
+        guard let dictionary = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let name = (dictionary["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty,
+              let version = (dictionary["version"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !version.isEmpty else { return nil }
+        return (name, version)
     }
 
-    private func shouldSkipProjectDirectory(_ name: String) -> Bool {
+    private var projectSkippedDirectories: Set<String> {
         [".git", "Library", "Applications", "DerivedData", "build", "dist", ".next", "target", "vendor",
-         "venv", ".venv", "Caches", "cache"].contains(name)
+         "venv", ".venv", "Caches", "cache"]
+    }
+
+    private var homeSkippedDirectories: Set<String> {
+        projectSkippedDirectories.union([
+            ".Trash", ".cache", ".npm", ".yarn", ".pnpm-store", ".bun", "Pods"
+        ])
     }
 }

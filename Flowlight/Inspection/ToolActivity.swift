@@ -2,8 +2,8 @@ import Foundation
 
 /// One tool call with everything known about it: when the model asked for it, what came back, and the network requests
 /// its tool made.
-struct ToolActivity: Identifiable, Equatable {
-    struct Request: Equatable {
+struct ToolActivity: Identifiable, Equatable, Sendable {
+    struct Request: Equatable, Sendable {
         var exchangeID: Int64
         var method: String
         var host: String
@@ -18,14 +18,14 @@ struct ToolActivity: Identifiable, Equatable {
     var result: ToolResult?
     var requests: [Request]
 
-    enum Outcome { case ok, error, pending }
+    enum Outcome: Sendable { case ok, error, pending }
     var outcome: Outcome { result.map { $0.isError ? .error : .ok } ?? .pending }
 }
 
 /// An MCP server an agent used, combined from its MCP config (network attribution), the model's tool calls
 /// (`mcp__server__tool`), JSON-RPC traffic to remote servers, and the connectors declared to the provider.
-struct MCPServerSummary: Identifiable, Equatable {
-    enum Kind: String, Equatable {
+struct MCPServerSummary: Identifiable, Equatable, Sendable {
+    enum Kind: String, Equatable, Sendable {
         /// A process on this Mac, started by the agent.
         case local
         /// This Mac speaks JSON-RPC to it over HTTP.
@@ -57,7 +57,7 @@ struct MCPServerSummary: Identifiable, Equatable {
 }
 
 /// What an agent's inspected LLM calls say about it: models, cost, and the tools it offers the model.
-struct AgentProfile: Equatable {
+struct AgentProfile: Equatable, Sendable {
     var requests = 0
     var failures = 0
     var usage = TokenUsage()
@@ -91,9 +91,12 @@ enum ToolActivityBuilder {
         for exchange in exchanges {
             for result in exchange.toolResults where results[result.callID] == nil { results[result.callID] = result }
         }
+        let exchangesByID = Dictionary(uniqueKeysWithValues: exchanges.compactMap { exchange in
+            exchange.id.map { ($0, exchange) }
+        })
         var requestsByCall: [String: [ToolActivity.Request]] = [:]
         for (exchangeID, link) in ToolCallLinks.link(exchanges) {
-            guard let callID = link.call.callID, let e = exchanges.first(where: { $0.id == exchangeID }) else { continue }
+            guard let callID = link.call.callID, let e = exchangesByID[exchangeID] else { continue }
             requestsByCall[callID, default: []].append(.init(exchangeID: exchangeID, method: e.method, host: e.host, path: e.path,
                                                              status: e.status, via: e.via))
         }
@@ -117,14 +120,24 @@ enum ToolActivityBuilder {
     /// the agent's JSON-RPC call to the server. Keep one entry (the model's), with the server's result if it has none.
     static func mergeDirectMCPCalls(_ list: [ToolActivity]) -> [ToolActivity] {
         var out = list.filter { $0.call.source != .mcp }
+        var indicesByKey: [String: [Int]] = [:]
+        for (index, activity) in out.enumerated() {
+            let server = activity.call.mcpServer?.lowercased() ?? ""
+            indicesByKey["\(server)|\(activity.call.name)", default: []].append(index)
+        }
         for direct in list where direct.call.source == .mcp {
-            if let i = out.lastIndex(where: {
-                $0.call.mcpServer?.lowercased() == direct.call.mcpServer?.lowercased() && $0.call.name == direct.call.name
-                    && $0.at <= direct.at && direct.at.timeIntervalSince($0.at) < 120
-            }) {
+            let key = "\(direct.call.mcpServer?.lowercased() ?? "")|\(direct.call.name)"
+            let match = indicesByKey[key, default: []].reversed().first { index in
+                let candidate = out[index]
+                return candidate.at <= direct.at && direct.at.timeIntervalSince(candidate.at) < 120
+            }
+            if let i = match {
                 if out[i].result == nil { out[i].result = direct.result }
             } else {
+                let index = out.count
                 out.append(direct)
+                let server = direct.call.mcpServer?.lowercased() ?? ""
+                indicesByKey["\(server)|\(direct.call.name)", default: []].append(index)
             }
         }
         return out

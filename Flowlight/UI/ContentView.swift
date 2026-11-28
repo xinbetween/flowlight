@@ -1,5 +1,14 @@
 import SwiftUI
 
+private struct AlertsSidebarLabel: View {
+    let badge: TrafficAlertBadge
+
+    var body: some View {
+        Label(SidebarItem.alerts.title, systemImage: SidebarItem.alerts.icon)
+            .badge(badge.count)
+    }
+}
+
 struct ContentView: View {
     @ObservedObject private var localization = Localization.shared
     @ObservedObject var rulePacks: RulePackStore
@@ -11,6 +20,7 @@ struct ContentView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var demoPluginReview: PluginPackageReview?
+    @State private var advisorySettingsTab: AdvisoriesTab?
 
     var body: some View {
         NavigationSplitView {
@@ -30,9 +40,14 @@ struct ContentView: View {
                 ForEach(SidebarSection.allCases) { section in
                     Section(section.title) {
                         ForEach(section.items) { item in
-                            Label(item.title, systemImage: item.icon)
-                                .badge(badge(for: item))
-                                .tag(item)
+                            if item == .alerts {
+                                AlertsSidebarLabel(badge: monitor.alertBadge)
+                                    .tag(item)
+                            } else {
+                                Label(item.title, systemImage: item.icon)
+                                    .badge(item == .rules ? rulePacks.pendingReviewCount : 0)
+                                    .tag(item)
+                            }
                         }
                     }
                 }
@@ -72,10 +87,15 @@ struct ContentView: View {
                 case .inspect: InspectView()
                 case .ask: AskView()
                 case .sources: SourcesView(selection: $nav.sourcesTab)
-                case .advisories: AdvisoriesView(store: monitor.advisories, updater: monitor.advisoryCatalog)
+                case .advisories:
+                    AdvisoriesView(store: monitor.advisories, updater: monitor.advisoryCatalog,
+                                   settingsTab: $advisorySettingsTab)
                 }
             }
+            // Keep native navigation sections under the sidebar's own style.
+            .disclosureGroupStyle(FullWidthDisclosureStyle())
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onChange(of: nav.selection) { _, _ in advisorySettingsTab = nil }
             .safeAreaInset(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
                     if focus.isActive {
@@ -96,7 +116,16 @@ struct ContentView: View {
                         .accessibilityLabel("\(L("Back")): \(destination.title)")
                     }
                 }
-                ToolbarItem {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    if nav.selection == .advisories {
+                        let title = nav.advisoriesTab.settingsTitle
+                        Button { advisorySettingsTab = nav.advisoriesTab } label: {
+                            Image(systemName: "gearshape")
+                        }
+                        .help(title)
+                        .accessibilityLabel(title)
+                        .accessibilityIdentifier("advisories.settings")
+                    }
                     Button { NSWorkspace.shared.open(Help.forScreen(nav.selection)) } label: {
                         Image(systemName: "questionmark.circle")
                     }
@@ -144,14 +173,6 @@ struct ContentView: View {
             Button(L("OK")) { monitor.lastError = nil }
         } message: {
             Text(monitor.lastError ?? "")
-        }
-    }
-
-    private func badge(for item: SidebarItem) -> Int {
-        switch item {
-        case .alerts: return monitor.unacknowledgedAlerts
-        case .rules: return rulePacks.pendingReviewCount
-        default: return 0
         }
     }
 

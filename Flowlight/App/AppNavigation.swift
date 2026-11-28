@@ -182,6 +182,21 @@ enum AlertsTab: String, CaseIterable, Identifiable {
     @MainActor var title: String { self == .alerts ? L("Alerts") : L("Detection") }
 }
 
+/// The two local inventories inside Advisories. Agent is intentionally first: it is the safest and most useful
+/// starting point for a new installation, while Software retains the existing signed-catalog inventory.
+enum AdvisoriesTab: String, CaseIterable, Identifiable, Equatable, Sendable {
+    case agent, software
+
+    var id: String { rawValue }
+
+    @MainActor var title: String {
+        switch self {
+        case .agent: return L("Agent")
+        case .software: return L("Software")
+        }
+    }
+}
+
 /// The two views inside Policies. The raw `rules` value is deliberately retained: restored windows and preferences
 /// written before the product rename must keep landing on the inventory rather than silently resetting.
 enum RulesTab: String, CaseIterable, Identifiable {
@@ -284,6 +299,12 @@ final class AppNavigation: ObservableObject {
         didSet { UserDefaults.standard.set(sourcesTab.rawValue, forKey: "FLSourcesTab") }
     }
     @Published var alertsTab: AlertsTab = .alerts
+    @Published var advisoriesTab: AdvisoriesTab = {
+        let raw = UserDefaults.standard.string(forKey: "FLAdvisoriesTab")
+        return AdvisoriesTab(rawValue: raw ?? "") ?? .agent
+    }() {
+        didSet { UserDefaults.standard.set(advisoriesTab.rawValue, forKey: "FLAdvisoriesTab") }
+    }
     @Published var rulesTab: RulesTab = {
         RulesTab.restored(from: UserDefaults.standard.string(forKey: "FLRulesTab"))
     }()

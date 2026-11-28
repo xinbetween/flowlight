@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import datetime as dt
 import hashlib
@@ -11,10 +12,13 @@ import io
 import json
 import pathlib
 import stat
+import subprocess
 import sys
 import tarfile
 import tempfile
 import unittest
+import zipfile
+from unittest import mock
 
 
 SCRIPT = pathlib.Path(__file__).with_name("workflow_evidence.py")
@@ -392,6 +396,103 @@ class PagesBundleTests(unittest.TestCase):
                     archive_digest=ARCHIVE_DIGEST,
                     now=NOW,
                 )
+
+
+class CommandLoggingTests(unittest.TestCase):
+    SENTINEL = "synthetic-private-fixture-value"
+
+    def run_cli(self, *args):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with (
+            mock.patch.object(sys, "argv", [str(SCRIPT), *map(str, args)]),
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            try:
+                code = workflow_evidence.main()
+            except SystemExit as error:
+                code = error.code
+        return code, stdout.getvalue(), stderr.getvalue()
+
+    def find_reuse(self, output):
+        return self.run_cli(
+            "find-reuse", "--repository", REPO, "--source-sha", OTHER_SHA,
+            "--source-tree", TREE, "--app-fingerprint", FINGERPRINT,
+            "--current-run-id", 999, "--github-output", output,
+        )
+
+    def test_reuse_logs_only_status_and_preserves_workflow_outputs(self):
+        for repository in (REPO, self.SENTINEL):
+            with self.subTest(valid=repository == REPO), tempfile.TemporaryDirectory() as temporary:
+                output = pathlib.Path(temporary) / "github-output"
+                artifact = artifact_fixture(expires_at="2099-01-01T00:00:00Z")
+
+                def download(_endpoint, archive):
+                    with zipfile.ZipFile(archive, "w") as bundle:
+                        bundle.writestr("review-receipt.json", json.dumps(receipt_fixture(repository=repository)))
+                    return ARCHIVE_DIGEST
+
+                with (
+                    mock.patch.object(workflow_evidence, "_gh_json", side_effect=[
+                        {"workflow_runs": [run_fixture()]}, {"tree": {"sha": TREE}}, {"artifacts": [artifact]},
+                    ]),
+                    mock.patch.object(workflow_evidence, "_gh_download", side_effect=download),
+                ):
+                    code, stdout, stderr = self.find_reuse(output)
+                self.assertEqual((code, stderr), (0, ""))
+                values = dict(line.split("=", 1) for line in output.read_text().splitlines())
+                if repository == REPO:
+                    self.assertEqual(stdout, "Reusing directly executed app evidence.\n")
+                    self.assertEqual(values, {
+                        "reuse": "true", "source_run_id": "101", "source_run_attempt": "2",
+                        "source_artifact_id": "501", "source_artifact_name": artifact["name"],
+                        "source_artifact_digest": ARCHIVE_DIGEST,
+                    })
+                else:
+                    self.assertEqual(stdout, "No reusable app evidence. The current run must execute its app jobs.\n")
+                    self.assertEqual(values, {
+                        "reuse": "false", "source_run_id": "", "source_run_attempt": "",
+                        "source_artifact_id": "", "source_artifact_name": "", "source_artifact_digest": "",
+                    })
+
+    def test_subprocess_error_does_not_log_command_or_output(self):
+        error = subprocess.CalledProcessError(1, ["gh", "api", self.SENTINEL], stderr=self.SENTINEL)
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.object(
+            workflow_evidence.subprocess, "run", side_effect=error
+        ):
+            output = pathlib.Path(temporary) / "github-output"
+            self.assertEqual(self.find_reuse(output), (
+                0, "No reusable app evidence. The current run must execute its app jobs.\n", "",
+            ))
+            self.assertTrue(output.read_text().startswith("reuse=false\n"))
+
+    def test_pages_rejection_does_not_log_event_field(self):
+        run = run_fixture(event="push", head_branch=self.SENTINEL)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            event = root / "event.json"
+            event.write_text(json.dumps({"workflow_run": run}))
+            with mock.patch.object(workflow_evidence, "_gh_json", return_value={"object": {"sha": SHA}}) as gh:
+                result = self.run_cli(
+                    "consume-pages", "--repository", REPO, "--event-json", event, "--output", root / "site",
+                )
+            self.assertEqual(gh.call_count, 1)
+            self.assertEqual(result, (1, "", "Workflow evidence failed. Evidence or its inputs failed validation.\n"))
+            self.assertFalse((root / "site").exists())
+
+    def test_unexpected_error_fails_closed_without_traceback(self):
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.object(
+            workflow_evidence, "_gh_json", side_effect=RuntimeError(self.SENTINEL)
+        ):
+            output = pathlib.Path(temporary) / "github-output"
+            self.assertEqual(self.find_reuse(output), (1, "", "Workflow evidence failed. Unexpected processing error.\n"))
+            self.assertFalse(output.exists())
+
+    def test_cli_parse_error_does_not_echo_invalid_argument(self):
+        code, stdout, stderr = self.run_cli("find-reuse", "--current-run-id", self.SENTINEL)
+        self.assertEqual((code, stdout), (2, ""))
+        self.assertIn("invalid command-line arguments", stderr)
+        self.assertNotIn(self.SENTINEL, stderr)
 
 
 class WorkflowContractTests(unittest.TestCase):

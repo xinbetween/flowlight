@@ -1,6 +1,72 @@
 /* Analysis/AnomalyEngine.swift */
 
+/* Software advisory details */
+"Software identity" = "ソフトウェアの識別情報";
+"Assessment" = "評価";
+"Build" = "ビルド";
+"Version evidence" = "バージョンの根拠";
+"Copy Path" = "パスをコピー";
+"Published" = "公開日";
+"Last modified" = "最終更新日";
+"Catalog evidence" = "カタログの検証情報";
+
+/* Software inventory coverage */
+"Packages & Executables" = "パッケージと実行ファイル";
+
+/* Agent advisories */
+"Agent advisories" = "エージェントのアドバイザリ";
+"Software" = "ソフトウェア";
+"Local agent metadata · bounded, no execution" = "ローカルエージェントメタデータ · 制限付き、実行なし";
+"Scan agent files" = "エージェントファイルをスキャン";
+"Scan /" = "/ をスキャン";
+"Scanning accessible agent metadata under /…" = "/ 以下のアクセス可能なエージェントメタデータをスキャン中…";
+"Agent metadata scan complete" = "エージェントメタデータのスキャン完了";
+"Agent metadata scan is incomplete" = "エージェントメタデータのスキャンは不完全です";
+"Private data access" = "プライベートデータへのアクセス";
+"Untrusted content" = "信頼できないコンテンツ";
+"External egress" = "外部への送信";
+"Agent finding" = "エージェントの検出結果";
+"Agent artifact discovered" = "エージェントアーティファクトを検出";
+"Credential-like material present" = "認証情報らしき内容があります";
+"Agent scan folders" = "エージェントスキャンフォルダ";
+"Allow a one-time scan of your home folder?" = "ホームフォルダの一度限りのスキャンを許可しますか？";
+"Scan home folder" = "ホームフォルダをスキャン";
+"Not now" = "今はしない";
+"Flowlight will inspect bounded Agent metadata under ~ locally. It will not execute files, upload findings, or enter protected media folders. macOS privacy controls may still make coverage incomplete." = "Flowlight は ~ 以下のエージェントメタデータを限定的にローカル検査します。ファイルを実行したり、結果をアップロードしたり、保護されたメディアフォルダに入ったりすることはありません。macOS のプライバシー制御により、カバレッジが不完全になる場合があります。";
+"The home folder is scanned by default. Add folders when agent metadata lives elsewhere; additions apply to the next explicit scan." = "ホームフォルダが既定でスキャンされます。エージェントメタデータが別の場所にある場合はフォルダを追加してください。追加内容は次回の明示的なスキャンに適用されます。";
+"Home folder (default)" = "ホームフォルダ（デフォルト）";
+"Scan configured agent folders?" = "設定したエージェントフォルダをスキャンしますか？";
+"Scan configured folders" = "設定したフォルダをスキャン";
+"Choose an additional folder for bounded local Agent metadata inspection. The folder is not scanned until you explicitly start an Agent advisory scan." = "エージェントメタデータを限定的にローカル検査する追加フォルダを選択してください。明示的にエージェントアドバイザリスキャンを開始するまで、フォルダはスキャンされません。";
+"Scanning accessible agent metadata in configured folders…" = "設定したフォルダのアクセス可能なエージェントメタデータをスキャン中…";
+"Add scan folder…" = "スキャンフォルダを追加…";
+"Remove scan folder" = "スキャンフォルダを削除";
+"Remove scan folder %@" = "スキャンフォルダ %@ を削除";
+"Start an explicit bounded scan of your home folder and any additional folders you selected. Hidden agent folders such as .claude and .codex are included; symlinks, generated folders, and unreadable locations are skipped and reported." = "ホームフォルダと選択した追加フォルダを明示的かつ限定的にスキャンします。.claude や .codex などの非表示エージェントフォルダも含まれます。シンボリックリンク、生成フォルダ、読み取れない場所は除外して報告します。";
+
 /* Advisories executable version probing */
+"Home folder" = "ホームフォルダ";
+"Inventory sources" = "インベントリのソース";
+"%lld found" = "%lld 件検出";
+"Complete" = "完了";
+"Limited" = "制限あり";
+"Home folder scan" = "ホームフォルダのスキャン";
+"Home folder package scanning is paused." = "ホームフォルダのパッケージスキャンは一時停止中です。";
+"The home folder could not be read." = "ホームフォルダを読み取れませんでした。";
+"Recursive home scan · depth %lld · %lld directories · system, generated, hidden, and cache folders skipped." = "ホームフォルダを再帰スキャン · 深さ %lld · %lld フォルダ · 隠し、保護、ビルド、キャッシュフォルダを除外。";
+"Home scan is bounded at depth %lld and %lld directories; system, generated, hidden, and cache folders are skipped." = "ホームスキャンは深さ %lld、%lld フォルダまでに制限され、保護、隠し、ビルド、キャッシュフォルダを除外します。";
+"Scan home folder recursively" = "ホームフォルダを再帰的にスキャン";
+"Flowlight reads package metadata locally with bounded depth and directory limits. It skips system, generated, hidden, and cache folders and never executes project code." = "Flowlight は深さとフォルダ数を制限してパッケージメタデータをローカルで読み取ります。保護、隠し、ビルド、キャッシュフォルダを除外し、プロジェクトコードは実行しません。";
+"Home folder scan is paused. Re-enable it to inspect package metadata under your home folder." = "ホームフォルダのスキャンは一時停止中です。再開するとパッケージメタデータを確認できます。";
+"This inventory may be incomplete. Only bounded, accessible sources are shown." = "このインベントリは不完全な可能性があります。制限内でアクセスできたソースのみ表示します。";
+"Choose an additional project folder. Flowlight also scans bounded package metadata throughout your home folder, while skipping system, generated, and cache folders." = "追加のプロジェクトフォルダを選択してください。Flowlight はホームフォルダの制限付きパッケージメタデータもスキャンし、保護・生成フォルダを除外します。";
+"Choose an additional folder for bounded local Agent metadata inspection. The folder is not scanned until you explicitly start an Agent advisory scan." = "エージェントメタデータを限定的にローカル検査する追加フォルダを選択してください。明示的にエージェントアドバイザリスキャンを開始するまで、フォルダはスキャンされません。";
+"None selected. The Advisories page also performs a bounded home-folder package scan." = "未選択です。アドバイザリページではホームフォルダの制限付きパッケージスキャンも行います。";
+"Matching is local and advisory-only. Standard application, executable, Homebrew, and home-folder package locations are bounded; system, generated, and cache folders are skipped. Clearing this data removes the cached catalog and its local matches." = "照合はローカルのみで助言目的です。アプリ、実行ファイル、Homebrew、ホームフォルダのパッケージ場所は制限され、保護・生成フォルダは除外されます。消去するとキャッシュ済みカタログとローカルの一致結果を削除します。";
+"Node packages and lockfiles are read only inside folders you choose. Flowlight never crawls your whole home folder." = "Node パッケージとロックファイルは、選択したフォルダ内だけで読み取ります。Flowlight がホームフォルダ全体を走査することはありません。";
+"No accessible software was found. Choose a project folder to inspect bounded package metadata, or scan again." = "アクセス可能なソフトウェアが見つかりません。プロジェクトフォルダを選択してパッケージメタデータを限定的に確認するか、再スキャンしてください。";
+"Choose a project folder. Flowlight reads bounded package metadata inside it; it never crawls your whole home folder." = "プロジェクトフォルダを選択してください。Flowlight はその中のパッケージメタデータを限定的に読み取り、ホームフォルダ全体を走査することはありません。";
+"Choose a project folder to inspect bounded package metadata" = "限定的なパッケージメタデータを確認するプロジェクトフォルダを選択";
 "Identify executable versions" = "実行ファイルのバージョンを特定";
 "Runs bounded local version checks for supported executables; inventory never leaves this Mac." = "対応する実行ファイルのバージョンをローカルで制限付き確認します。インベントリがMacの外に出ることはありません。";
 "Stop" = "停止";
@@ -8,11 +74,19 @@
 "Checked %lld of %lld supported executables" = "%lld/%lld個の対応実行ファイルを確認";
 "%lld supported executable%@ found. Version checks are explicit and time-limited." = "%lld個の対応実行ファイルが見つかりました。バージョン確認は明示的に実行され、時間制限があります。";
 "No supported executable versions were found to identify." = "特定できる対応実行ファイルのバージョンが見つかりませんでした。";
-"Identified %lld of %lld executable versions; some remain unknown." = "%lld/%lld個の実行ファイルのバージョンを特定しました。一部は不明のままです。";
+"Identified %lld of %lld executable versions; some remain unavailable." = "%lld/%lld個の実行ファイルのバージョンを特定しました。一部は利用できません。";
 "Identified %lld of %lld executable versions." = "%lld/%lld個の実行ファイルのバージョンを特定しました。";
 "Executable version output" = "実行ファイルのバージョン出力";
 "Packages" = "パッケージ";
 "Version identified" = "バージョンを特定しました";
+"Executable metadata" = "実行ファイルのメタデータ";
+"Needs review" = "要確認";
+"Version check available" = "バージョン確認を実行できます";
+"Version not checked" = "バージョン未確認";
+"No authoritative version" = "信頼できるバージョン情報なし";
+"Version recorded; comparison unavailable" = "バージョン記録済み（比較不可）";
+"No version evidence" = "バージョンの証拠なし";
+"Not assessed for version" = "バージョン未評価";
 "Version check not attempted" = "バージョン確認は未実行";
 "Executable unavailable" = "実行ファイルを利用できません";
 "Version command failed" = "バージョンコマンドに失敗";
@@ -2150,3 +2224,56 @@
 "Review new alerts in Flowlight" = "Flowlight で新しいアラートを確認";
 "Runtime" = "ランタイム";
 "The selected pack is configured but is not blocking until the Network Extension and inspection matcher both acknowledge the exact desired digest." = "選択したパックは設定されていますが、Network Extension とインスペクションマッチャーの両方が目的の正確なダイジェストを確認するまでブロックされません。";
+
+/* Agent advisory analysis */
+"Advisory analysis" = "アドバイザリ分析";
+"Allow home folder scans?" = "ホームフォルダのスキャンを許可しますか？";
+"Allow scans" = "スキャンを許可";
+"Apple on-device model" = "Appleのオンデバイスモデル";
+"Inventory only" = "インベントリのみ";
+"This Mac can't run the on-device model." = "このMacではオンデバイスモデルを実行できません。";
+"With your consent, Flowlight scans your home folder and any folders you add." = "許可すると、Flowlightはホームフォルダと追加したフォルダをスキャンします。";
+"Reviewing scan evidence on this Mac…" = "このMacでスキャン結果を確認中…";
+"No evidence available for model analysis." = "モデルで分析できる結果がありません。";
+"The inventory is available below." = "インベントリは下で確認できます。";
+"Evidence: %@" = "証拠：%@";
+"Artifact" = "アーティファクト";
+"Provenance" = "出所";
+"Supported settings inspected: %lld of %lld found" = "対応する設定のうち、検出した項目を確認：%lld / %lld";
+"Findings hidden by the display limit: %lld" = "表示上限で非表示の検出結果：%lld";
+"Choose an additional folder for local agent settings scans." = "エージェント設定をローカルでスキャンするフォルダを追加してください。";
+
+/* AI Agents activity coverage */
+"Loading agent activity…" = "エージェントのアクティビティを読み込み中…";
+"Refreshing agent activity…" = "エージェントのアクティビティを更新中…";
+"Could not load agent activity." = "エージェントのアクティビティを読み込めませんでした。";
+"Showing %lld of %lld agent traffic relationships. Traffic totals are complete." = "エージェントの通信関係を%lld件（全%lld件）表示しています。通信量の合計はすべての関係を含みます。";
+"Inspection detail is partial for this window." = "この期間の検査詳細は一部のみ表示しています。";
+"%lld traffic relationships omitted for this agent. Destination and tool detail is partial." = "このエージェントの通信関係を%lld件省略しています。宛先とツールの詳細は一部のみ表示されます。";
+"Destination policy coverage is partial." = "宛先に対するポリシーの適用範囲は一部のみ確認できました。";
+"Showing %lld of %lld destinations." = "宛先を%lld件（全%lld件）表示しています。";
+"Showing %lld of %lld tool calls." = "ツール呼び出しを%lld件（全%lld件）表示しています。";
+"Partial" = "一部";
+"Mach-O source version (display only)" = "Mach-O ソースバージョン（表示のみ）";
+"Recursive home scan · depth %lld · up to %lld entries · system, generated, hidden, and cache folders skipped." = "ホームフォルダの再帰スキャン · 深さ %lld · 最大 %lld 項目 · システム、ビルド、隠し、キャッシュフォルダを除外。";
+"The home folder was only partially inspected. The scan checks up to %lld entries at depth %lld and skips system, generated, hidden, and cache folders." = "ホームフォルダの一部を確認しました。スキャンでは最大 %lld 項目を深さ %lld まで確認し、システム、ビルド、隠し、キャッシュフォルダを除外します。";
+"Couldn't save the agent's destination policy: %@" = "エージェントの接続先ポリシーを保存できませんでした：%@";
+"The agent's destination policy was saved, but Flowlight couldn't fully apply it: %@" = "エージェントの接続先ポリシーは保存されましたが、Flowlight で完全に適用できませんでした：%@";
+"Updating policy…" = "ポリシーを更新中…";
+"Partly allowed" = "一部許可";
+
+/* Advisories dashboards */
+"Software inventory" = "ソフトウェア一覧";
+"%lld software artifacts" = "%lld 件のソフトウェア項目";
+"Inventory overview" = "インベントリの概要";
+"Inventory sources and catalog" = "インベントリのソースとカタログ";
+"Agent Advisories Settings" = "エージェントのアドバイザリ設定";
+"Software Advisories Settings" = "ソフトウェアのアドバイザリ設定";
+"No accessible software was found. Use Software Advisories Settings to choose a project folder." = "アクセス可能なソフトウェアが見つかりません。ソフトウェアのアドバイザリ設定でプロジェクトフォルダを選択してください。";
+"No findings" = "検出項目なし";
+"Review scan coverage for the locations and files that were inspected." = "検査した場所とファイルはスキャン範囲で確認できます。";
+"Try another severity or surface filter." = "別の重大度または対象のフィルタを試してください。";
+"Scan overview" = "スキャンの概要";
+"Scan coverage and analysis" = "スキャン範囲と分析";
+"Category" = "カテゴリ";
+"Paused" = "一時停止中";

@@ -1,6 +1,54 @@
 import AppKit
 import SwiftUI
 
+/// Keeps disclosure headers actionable across the entire row, including empty space after the label.
+struct FullWidthDisclosureStyle: DisclosureGroupStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            FullWidthDisclosureHeader(isExpanded: configuration.$isExpanded) {
+                configuration.label
+            }
+
+            if configuration.isExpanded {
+                configuration.content
+                    .padding(.leading, 10 + Spacing.s)
+            }
+        }
+    }
+}
+
+/// A separate header row also works in grouped forms, where each expanded control needs its own row.
+struct FullWidthDisclosureHeader<Label: View>: View {
+    @Binding var isExpanded: Bool
+    var horizontalPadding: CGFloat = 0
+    var verticalPadding: CGFloat = 0
+    @ViewBuilder var label: Label
+
+    var body: some View {
+        Button {
+            isExpanded.toggle()
+        } label: {
+            HStack(spacing: Spacing.s) {
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.forward")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 10)
+                    .accessibilityHidden(true)
+                label
+            }
+            .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
+            .padding(.horizontal, horizontalPadding)
+            .padding(.vertical, verticalPadding)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .accessibilityValue(isExpanded ? L("Expanded") : L("Collapsed"))
+        .accessibilityHint(isExpanded ? L("Collapse section") : L("Expand section"))
+    }
+}
+
 /// App icons via NSWorkspace, cached by bundle path.
 @MainActor
 enum AppIcons {

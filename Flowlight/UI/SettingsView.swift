@@ -78,7 +78,7 @@ struct DataPrivacySettingsTab: View {
                 Text(L("Minute rollups are kept 14 days, hourly 400 days, daily forever. Alerts are kept 90 days."))
                     .font(.caption).foregroundStyle(.secondary)
             }
-            AdvisoryCatalogSettingsSection()
+            AdvisoryCatalogSettingsSection(updater: monitor.advisoryCatalog)
 
             Section {
                 LabeledContent(L("Database")) {
@@ -114,15 +114,26 @@ struct DataPrivacySettingsTab: View {
     }
 }
 
-private struct AdvisoryCatalogSettingsSection: View {
-    @EnvironmentObject private var monitor: TrafficMonitor
-    @State private var automaticRefresh = false
+struct AdvisoryCatalogSettingsSection: View {
+    @ObservedObject var updater: AdvisoryCatalogUpdater
+    var foldersDisabled = false
+    @State private var changingAutomaticRefresh = false
     @State private var showClearConfirmation = false
     @State private var projectRoots: [AdvisoryInventoryRoot] = []
 
+    private var automaticRefresh: Binding<Bool> {
+        Binding(get: { updater.catalogState.update.automaticRefresh }, set: { enabled in
+            changingAutomaticRefresh = true
+            Task {
+                await updater.setAutomaticRefresh(enabled)
+                changingAutomaticRefresh = false
+            }
+        })
+    }
+
     var body: some View {
         Section {
-            Toggle(isOn: $automaticRefresh) {
+            Toggle(isOn: automaticRefresh) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L("Check for advisory updates automatically"))
                     Text(L("Only a signed catalog is downloaded; your software inventory never leaves this Mac."))
@@ -130,18 +141,16 @@ private struct AdvisoryCatalogSettingsSection: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .onChange(of: automaticRefresh) { _, enabled in
-                Task { await monitor.advisoryCatalog.setAutomaticRefresh(enabled) }
-            }
+            .disabled(changingAutomaticRefresh)
             LabeledContent(L("Catalog source"), value: "flowlight.xinbetween.com")
                 .font(.caption)
-            LabeledContent(L("Catalog status"), value: statusTitle)
+            LabeledContent(L("Catalog status"), value: updater.advisoryStatusTitle)
                 .font(.caption)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(L("Selected project folders"))
                 if projectRoots.isEmpty {
-                    Text(L("None. Node packages are inspected only in folders you choose."))
+                    Text(L("None selected. The Advisories page also performs a bounded home-folder package scan."))
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
                     ForEach(projectRoots) { root in
@@ -151,50 +160,55 @@ private struct AdvisoryCatalogSettingsSection: View {
                             Spacer()
                             Button(L("Remove")) { removeProjectRoot(root) }
                                 .buttonStyle(.borderless)
+                                .disabled(foldersDisabled)
+                                .accessibilityLabel(L("Remove scan folder %@", root.path))
                         }
                     }
                 }
                 Button { chooseProjectRoot() } label: {
                     Label(L("Add project folder…"), systemImage: "plus")
                 }
-                .help(L("Choose a bounded project folder; the whole home directory is never scanned"))
+                .disabled(foldersDisabled)
+                .accessibilityIdentifier("advisories.add-project-folder")
+                .help(L("Choose a project folder to inspect bounded package metadata"))
             }
 
             Button(L("Refresh advisory catalog now")) {
-                Task { await monitor.advisoryCatalog.checkNow() }
+                Task { await updater.checkNow() }
             }
-            .disabled(monitor.advisoryCatalog.status == .checking)
+            .disabled(updater.status == .checking)
+            .accessibilityIdentifier("advisories.refresh-catalog")
             Button(L("Clear downloaded advisory data…"), role: .destructive) {
                 showClearConfirmation = true
             }
         } header: {
             Text(L("Software advisories"))
         } footer: {
-            Text(L("Matching is local and advisory-only. Standard application, executable, and Homebrew locations are bounded; node_modules is inspected only under selected folders. Clearing this data removes the cached catalog and its local matches."))
+            Text(L("Matching is local and advisory-only. Standard application, executable, Homebrew, and home-folder package locations are bounded; system, generated, and cache folders are skipped. Clearing this data removes the cached catalog and its local matches."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .task {
-            automaticRefresh = monitor.advisoryCatalog.catalogState.update.automaticRefresh
-            projectRoots = AdvisoryInventoryPreferences.selectedProjectRoots
+        .task { reloadProjectRoots() }
+        .onReceive(NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)) { _ in
+            reloadProjectRoots()
         }
         .confirmationDialog(L("Clear the cached advisory catalog and local matches?"), isPresented: $showClearConfirmation,
                             titleVisibility: .visible) {
             Button(L("Clear advisory data"), role: .destructive) {
-                Task { await monitor.advisoryCatalog.clearLocalCatalog() }
+                Task { await updater.clearLocalCatalog() }
             }
         }
     }
 
+    private func reloadProjectRoots() {
+        let roots = AdvisoryInventoryPreferences.selectedProjectRoots
+        if projectRoots != roots { projectRoots = roots }
+    }
+
+    @MainActor
     private func chooseProjectRoot() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = L("Choose")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        let bookmark = try? url.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
-        let root = AdvisoryInventoryRoot(path: url.standardizedFileURL.path, userSelected: true, bookmarkData: bookmark)
+        guard let root = AdvisoryProjectFolderPicker.choose() else { return }
+        projectRoots = AdvisoryInventoryPreferences.selectedProjectRoots
         guard !projectRoots.contains(where: { $0.id == root.id }) else { return }
         projectRoots.append(root)
         projectRoots.sort { $0.path.localizedCaseInsensitiveCompare($1.path) == .orderedAscending }
@@ -202,12 +216,14 @@ private struct AdvisoryCatalogSettingsSection: View {
     }
 
     private func removeProjectRoot(_ root: AdvisoryInventoryRoot) {
-        projectRoots.removeAll { $0.id == root.id }
+        projectRoots = AdvisoryInventoryPreferences.selectedProjectRoots.filter { $0.id != root.id }
         AdvisoryInventoryPreferences.saveSelectedProjectRoots(projectRoots)
     }
+}
 
-    private var statusTitle: String {
-        switch monitor.advisoryCatalog.status {
+extension AdvisoryCatalogUpdater {
+    var advisoryStatusTitle: String {
+        switch status {
         case .idle: return L("Not checked")
         case .checking: return L("Checking…")
         case .current: return L("Current")

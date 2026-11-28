@@ -401,7 +401,10 @@ struct FlowlightApp: App {
         }
 
         Settings {
-            SettingsView().environmentObject(monitor).environmentObject(updater)
+            SettingsView()
+                .environmentObject(monitor)
+                .environmentObject(updater)
+                .disclosureGroupStyle(FullWidthDisclosureStyle())
         }
     }
 }
