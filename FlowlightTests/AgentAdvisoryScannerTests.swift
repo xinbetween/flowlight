@@ -159,10 +159,23 @@ final class AgentAdvisoryScannerTests: XCTestCase {
               api_key : synthetic-YAML-flow-key
             }
             """#, to: ".continue/spaced-flow.yml", under: root)
+            try write(#"""
+            env: {
+              # Example comment: api_key is configured below.
+              api_key: synthetic-YAML-comment
+            }
+            """#, to: ".continue/flow-comment.yml", under: root)
+            try write(#"""
+            env: {
+              description: Today's environment with 'ordinary prose',
+              api_key: 'synthetic-YAML-plain-apostrophe'
+            }
+            """#, to: ".continue/flow-plain.yml", under: root)
 
             let scan = AgentAdvisoryScanner(configuration: .init(roots: [root])).scan()
             let credentials = scan.findings.filter { $0.category == .credentials }
-            XCTAssertEqual(credentials.map(\.source), ["scan-root/.continue/block.yml", "scan-root/.continue/inline.yaml",
+            XCTAssertEqual(credentials.map(\.source), ["scan-root/.continue/block.yml", "scan-root/.continue/flow-comment.yml",
+                                                       "scan-root/.continue/flow-plain.yml", "scan-root/.continue/inline.yaml",
                                                        "scan-root/.continue/nested.yaml", "scan-root/.continue/sequence.yml",
                                                        "scan-root/.continue/spaced-block.yml", "scan-root/.continue/spaced-flow.yml"])
             XCTAssertTrue(credentials.allSatisfy { $0.severity == .critical })
